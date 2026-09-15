@@ -873,6 +873,7 @@
       }
     }
 
+    // تابع ارسال فاکتور جدولی به تلگرام
     async function sendToTelegram() {
       if (cart.length === 0) { alert("سبد خرید خالی است!"); return; }
 
@@ -880,13 +881,43 @@
       sendBtn.disabled = true;
       sendBtn.innerText = "در حال ارسال...";
 
-      let text = "🛒 <b>فاکتور جدید خرید</b>\n\n";
-      let totalSum = 0;
-      cart.forEach((item, i) => {
-        text += `${i + 1}. <b>${item.name}</b>\n   تعداد: ${item.quantity} | قیمت: ${item.total.toLocaleString()} تومان\n`;
+      // تاریخ و ساعت
+      var now = new Date();
+      var dateStr = now.toLocaleDateString('fa-IR');
+      var timeStr = now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+
+      // کادربندی جدول مخصوص تلگرام (استفاده از تگ pre برای چینش ستونی)
+      var text = "🧾 <b>فاکتور جدید فروشگاه</b>\n";
+      text += "📅 تاریخ: " + dateStr + " — " + timeStr + "\n";
+      text += "━━━━━━━━━━━━━━━━━━━━\n";
+      text += "<pre>\n";
+      text += "┌───┬────────────────┬───┬──────────┐\n";
+      text += "│ # │ نام کالا       │تعداد│ مبلغ(تومان)│\n";
+      text += "├───┼────────────────┼───┼──────────┤\n";
+
+      var totalSum = 0;
+      var totalItemsCount = 0;
+
+      for (var i = 0; i < cart.length; i++) {
+        var item = cart[i];
         totalSum += item.total;
-      });
-      text += `\n💰 <b>جمع کل: ${totalSum.toLocaleString()} تومان</b>`;
+        totalItemsCount += item.quantity;
+
+        var rowNum = (i + 1).toString().padEnd(2, ' ');
+        // کوتاه کردن نام کالا تا ۱۴ کاراکتر برای حفظ تناسب جدول
+        var nameCut = item.name.length > 14 ? item.name.substring(0, 12) + '..' : item.name;
+        var namePadded = nameCut.padEnd(14, ' ');
+        var qtyPadded = item.quantity.toString().padStart(2, ' ');
+        var priceFormatted = item.total.toLocaleString().padStart(9, ' ');
+
+        text += "│" + rowNum + "│" + namePadded + "│" + qtyPadded + "│" + priceFormatted + "│\n";
+      }
+
+      text += "└───┴────────────────┴───┴──────────┘\n";
+      text += "</pre>\n";
+      text += "💰 <b>جمع کل فاکتور: " + totalSum.toLocaleString() + " تومان</b>\n";
+      text += "📦 <b>تعداد اقلام: " + totalItemsCount + " عدد</b>\n";
+      text += "━━━━━━━━━━━━━━━━━━━━";
 
       try {
         const response = await fetch(WORKER_URL, {
