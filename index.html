@@ -51,6 +51,12 @@
 <body class="bg-gray-100 min-h-screen p-3 md:p-6 font-sans select-none">
   <div class="max-w-md mx-auto bg-white rounded-2xl shadow-md overflow-hidden p-5">
     
+    <!-- هدر بالای صفحه و خروج -->
+    <div class="flex justify-between items-center mb-3 pb-2 border-b">
+      <span class="text-xs font-bold text-gray-500">سیستم مدیریت و فروش</span>
+      <button onclick="logout()" class="text-xs text-red-500 hover:text-red-700 font-bold bg-red-50 px-2 py-1 rounded-lg border border-red-100">🔒 خروج / تغییر رمز</button>
+    </div>
+
     <!-- تب‌های بالای صفحه -->
     <div class="flex border-b mb-4">
       <button id="tab-scan-btn" onclick="switchTab('scan')" class="flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600">فروش و اسکن</button>
@@ -198,9 +204,8 @@
   <div id="print-page-a4" class="hidden"></div>
 
   <script>
-    // ⚠️ آدرس Worker و رمز ورود خود را تنظیم کنید
     const WORKER_URL = "https://godrati.ez-1332d6.workers.dev";
-    const APP_PASSWORD = "1234"; // هم‌نام با متغیر APP_PASSWORD در کلودفلر
+    let appPassword = localStorage.getItem('app_password') || '';
 
     let database = {};
     let currentProduct = null;
@@ -248,16 +253,39 @@
       } catch(e) {}
     }
 
+    // --- مدیریت رمز عبور ---
+    function checkPassword() {
+      if (!appPassword) {
+        appPassword = prompt("لطفاً رمز ورود به سیستم را وارد کنید:");
+        if (appPassword) {
+          localStorage.setItem('app_password', appPassword);
+        } else {
+          alert("برای استفاده از برنامه باید رمز ورود را وارد کنید.");
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function logout() {
+      localStorage.removeItem('app_password');
+      appPassword = '';
+      location.reload();
+    }
+
     // --- توابع ارتباط با کلودفلر KV ---
     async function fetchDatabaseFromCloud() {
+      if (!appPassword) return;
+
       try {
         const res = await fetch(`${WORKER_URL}/products`, {
-          headers: { "Authorization": APP_PASSWORD }
+          headers: { "Authorization": appPassword }
         });
         if (res.ok) {
           database = await res.json();
         } else if (res.status === 401) {
-          alert("رمز عبور اشتباه است یا در کلودفلر تنظیم نشده است.");
+          alert("رمز عبور اشتباه است.");
+          logout();
         }
       } catch (err) {
         console.error("خطا در دریافت دیتابیس:", err);
@@ -265,15 +293,21 @@
     }
 
     async function saveDatabaseToCloud() {
+      if (!appPassword) return;
+
       try {
-        await fetch(`${WORKER_URL}/products`, {
+        const res = await fetch(`${WORKER_URL}/products`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": APP_PASSWORD
+            "Authorization": appPassword
           },
           body: JSON.stringify(database)
         });
+        if (res.status === 401) {
+          alert("رمز عبور اشتباه است.");
+          logout();
+        }
       } catch (err) {
         console.error("خطا در ذخیره دیتابیس:", err);
       }
@@ -317,20 +351,19 @@
       isProcessingScan = true;
       try { html5QrCode.pause(); } catch(e){}
 
-      // به روزرسانی همزمان محصولات از کلودفلر
       await fetchDatabaseFromCloud();
 
       const product = database[decodedText];
 
       if (product) {
-        playSuccessSound(); // 🔊 صدای تایید کالا
+        playSuccessSound();
         currentProduct = { barcode: decodedText, ...product };
         document.getElementById('product-name').innerText = product.name;
         document.getElementById('product-price').innerText = product.price.toLocaleString();
         document.getElementById('quantity').value = 1;
         document.getElementById('product-info').classList.remove('hidden');
       } else {
-        playErrorSound(); // 🔊 صدای اخطار کالا
+        playErrorSound();
         tempBarcode = decodedText;
         document.getElementById('modal-barcode').innerText = decodedText;
         document.getElementById('unknown-modal').classList.remove('hidden');
@@ -379,7 +412,7 @@
       }
 
       database[barcode] = { name: name, price: price };
-      await saveDatabaseToCloud(); // ذخیره مستقیم در KV کلودفلر
+      await saveDatabaseToCloud();
       
       document.getElementById('new-barcode').value = '';
       document.getElementById('new-name').value = '';
@@ -589,7 +622,7 @@
           method: "POST",
           headers: { 
             "Content-Type": "application/json",
-            "Authorization": APP_PASSWORD 
+            "Authorization": appPassword 
           },
           body: JSON.stringify({ message: text })
         });
@@ -613,8 +646,10 @@
     }
 
     window.addEventListener('DOMContentLoaded', async () => {
-      await fetchDatabaseFromCloud();
-      startScanner();
+      if (checkPassword()) {
+        await fetchDatabaseFromCloud();
+        startScanner();
+      }
     });
   </script>
 </body>
