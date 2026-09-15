@@ -84,9 +84,9 @@
 
     <!-- تب‌های بالای صفحه -->
     <div class="flex border-b mb-4">
-      <button id="tab-scan-btn" onclick="switchTab('scan')" class="flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600">فروش و اسکن</button>
-      <button id="tab-manage-btn" onclick="switchTab('manage')" class="flex-1 py-2 font-bold text-gray-500">مدیریت اجناس</button>
-      <button id="tab-print-btn" onclick="switchTab('print')" class="flex-1 py-2 font-bold text-gray-500">چاپ بارکدها</button>
+      <button id="tab-scan-btn" onclick="switchTab('scan')" class="flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm">فروش و اسکن</button>
+      <button id="tab-manage-btn" onclick="switchTab('manage')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">مدیریت اجناس</button>
+      <button id="tab-print-btn" onclick="switchTab('print')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">چاپ بارکدها</button>
     </div>
 
     <!-- ==================== بخش فروش و اسکن ==================== -->
@@ -163,7 +163,8 @@
 
           <div>
             <label class="text-xs text-gray-600 block mb-1">قیمت (تومان):</label>
-            <input type="number" id="new-price" placeholder="مثلاً: 45000" class="w-full p-2 border rounded-lg text-sm">
+            <!-- فیلد قیمت با جداسازی سه رقم سه رقم -->
+            <input type="text" id="new-price" oninput="formatPriceInput(this)" placeholder="مثلاً: 45,000" class="w-full p-2 border rounded-lg text-sm dir-ltr text-right">
           </div>
 
           <button id="save-btn" onclick="saveProduct()" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-700 transition">
@@ -174,7 +175,7 @@
 
       <!-- تنظیمات چاپ چندتایی لیبل روی A4 -->
       <div id="batch-print-box" class="bg-blue-50 p-4 rounded-xl border border-blue-200 mb-4 hidden">
-        <h3 class="font-bold text-blue-900 text-sm mb-2">🖨️ تنظیمات چاپ چندتایی روی برگه A4</h3>
+        <h3 class="font-bold text-blue-900 text-sm mb-2">🖨️ تنظیمات چاپ روی برگه A4</h3>
         <p id="selected-print-title" class="text-xs text-blue-700 mb-2"></p>
         
         <div class="flex items-center gap-2 mb-3">
@@ -204,8 +205,24 @@
 
     <!-- ==================== بخش چاپ بارکدها ==================== -->
     <div id="tab-print" class="hidden">
-      <h3 class="font-bold text-gray-700 text-sm mb-3">بارکدهای تولیدی برنامه (کدهای با پیشوند ۹۰):</h3>
-      <div id="generated-barcodes-list" class="space-y-3 max-h-80 overflow-y-auto"></div>
+      <!-- پنل ابزار انتخاب و چاپ دسته جمعی -->
+      <div class="bg-blue-50 border border-blue-200 p-3 rounded-xl mb-3">
+        <div class="flex justify-between items-center mb-2">
+          <span class="font-bold text-blue-900 text-xs sm:text-sm">🖨️ چاپ سفارشی برچسب‌های ۹۰...</span>
+          <button onclick="toggleSelectAllPrints()" id="select-all-btn" class="text-xs bg-white text-blue-700 border border-blue-300 hover:bg-blue-50 px-2.5 py-1 rounded-lg font-bold transition">
+            ☑️ انتخاب همه
+          </button>
+        </div>
+        <div class="flex justify-between items-center text-xs text-gray-600 mb-3 bg-white p-2 rounded-lg border border-blue-100">
+          <span>مجموع برچسب‌ها جهت چاپ روی A4:</span>
+          <span class="font-bold text-blue-700 text-sm"><span id="total-print-labels-count">0</span> برچسب</span>
+        </div>
+        <button onclick="executeMultiPrint()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-xs sm:text-sm shadow transition flex items-center justify-center gap-1">
+          🖨️ چاپ برچسب‌های انتخابی روی برگه A4
+        </button>
+      </div>
+
+      <div id="generated-barcodes-list" class="space-y-3 max-h-[380px] overflow-y-auto pr-1"></div>
     </div>
 
   </div>
@@ -242,6 +259,16 @@
     let isTorchOn = false;
     let isProcessingScan = false;
     let audioCtx = null;
+
+    // تابع فرمت جداکننده ۳ رقم ۳ رقم برای قیمت
+    function formatPriceInput(input) {
+      let value = input.value.replace(/,/g, '').replace(/[^\d]/g, '');
+      if (value) {
+        input.value = Number(value).toLocaleString();
+      } else {
+        input.value = '';
+      }
+    }
 
     // توابع پخش صدای بیپ بدون نیاز به فایل خارجی
     function initAudio() {
@@ -339,429 +366,3 @@
         });
 
         const data = await response.json();
-
-        if (response.ok && data.success) {
-          sessionStorage.setItem('is_logged_in', 'true');
-          sessionStorage.setItem('app_pass', inputPass);
-          document.getElementById('login-screen').classList.add('hidden');
-          document.getElementById('main-app').classList.remove('hidden');
-          await syncDatabaseWithCloudflare();
-          startScanner();
-        } else {
-          errorEl.innerText = data.message || "رمز عبور اشتباه است!";
-          errorEl.classList.remove('hidden');
-          document.getElementById('app-password').value = '';
-        }
-      } catch (err) {
-        errorEl.innerText = "خطا در ارتباط با سرور کلادفلر!";
-        errorEl.classList.remove('hidden');
-        console.error("Login Error:", err);
-      } finally {
-        loginBtn.disabled = false;
-        loginBtn.innerText = "ورود به برنامه";
-      }
-    }
-
-    function handleLogout() {
-      sessionStorage.removeItem('is_logged_in');
-      sessionStorage.removeItem('app_pass');
-      location.reload();
-    }
-
-    async function checkAuthOnLoad() {
-      if (sessionStorage.getItem('is_logged_in') === 'true') {
-        document.getElementById('login-screen').classList.add('hidden');
-        document.getElementById('main-app').classList.remove('hidden');
-        await syncDatabaseWithCloudflare();
-        startScanner();
-      }
-    }
-
-    // تنظیمات اسکنر
-    const scanConfig = {
-      fps: 15,
-      qrbox: { width: 260, height: 160 },
-      aspectRatio: 1.0,
-      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.CODE_39
-      ]
-    };
-
-    function startScanner() {
-      if (html5QrCode) return;
-
-      html5QrCode = new Html5Qrcode("reader");
-      html5QrCode.start(
-        { facingMode: "environment" },
-        scanConfig,
-        onScanSuccess
-      ).then(() => {
-        const capabilities = html5QrCode.getRunningTrackCapabilities();
-        if (capabilities.torch) document.getElementById('torch-btn').classList.remove('hidden');
-      }).catch(err => console.error("خطا در دوربین:", err));
-    }
-
-    function toggleTorch() {
-      isTorchOn = !isTorchOn;
-      html5QrCode.applyVideoConstraints({ advanced: [{ torch: isTorchOn }] });
-    }
-
-    function onScanSuccess(decodedText) {
-      if (isProcessingScan) return;
-
-      isProcessingScan = true;
-      try { html5QrCode.pause(); } catch(e){}
-
-      const product = database[decodedText];
-
-      if (product) {
-        playSuccessBeep();
-        currentProduct = { barcode: decodedText, ...product };
-        document.getElementById('product-name').innerText = product.name;
-        document.getElementById('product-price').innerText = product.price.toLocaleString();
-        document.getElementById('quantity').value = 1;
-        document.getElementById('product-info').classList.remove('hidden');
-      } else {
-        playErrorBeep();
-        tempBarcode = decodedText;
-        document.getElementById('modal-barcode').innerText = decodedText;
-        document.getElementById('unknown-modal').classList.remove('hidden');
-      }
-    }
-
-    function cancelScan() {
-      document.getElementById('product-info').classList.add('hidden');
-      currentProduct = null;
-      isProcessingScan = false;
-      try { html5QrCode.resume(); } catch(e){}
-    }
-
-    function closeUnknownModal() {
-      document.getElementById('unknown-modal').classList.add('hidden');
-      tempBarcode = "";
-      isProcessingScan = false;
-      try { html5QrCode.resume(); } catch(e){}
-    }
-
-    function goToRegisterProduct() {
-      document.getElementById('unknown-modal').classList.add('hidden');
-      document.getElementById('new-barcode').value = tempBarcode;
-      switchTab('manage');
-      tempBarcode = "";
-      isProcessingScan = false;
-    }
-
-    function generateRandomBarcode() {
-      let uniqueCode = "";
-      do {
-        uniqueCode = "90" + Math.floor(1000 + Math.random() * 9000);
-      } while (database[uniqueCode]);
-
-      document.getElementById('new-barcode').value = uniqueCode;
-    }
-
-    async function saveProduct() {
-      const barcode = document.getElementById('new-barcode').value.trim();
-      const name = document.getElementById('new-name').value.trim();
-      const price = parseInt(document.getElementById('new-price').value);
-
-      if (!barcode || !name || isNaN(price)) {
-        alert("لطفاً تمامی فیلدها را به درستی وارد کنید.");
-        return;
-      }
-
-      const saveBtn = document.getElementById('save-btn');
-      saveBtn.disabled = true;
-      saveBtn.innerText = "در حال ذخیره...";
-
-      database[barcode] = { name: name, price: price };
-      localStorage.setItem('grocery_db', JSON.stringify(database));
-      
-      await saveDatabaseToCloudflare();
-
-      document.getElementById('new-barcode').value = '';
-      document.getElementById('new-name').value = '';
-      document.getElementById('new-price').value = '';
-      renderProductsList();
-      
-      saveBtn.disabled = false;
-      saveBtn.innerText = "ذخیره کالا در سیستم";
-
-      switchTab('scan');
-    }
-
-    function prepareBatchPrint(barcode) {
-      selectedPrintItem = { barcode: barcode, ...database[barcode] };
-      document.getElementById('selected-print-title').innerText = `کالا: ${selectedPrintItem.name} (${selectedPrintItem.price.toLocaleString()} تومان)`;
-      document.getElementById('batch-print-box').classList.remove('hidden');
-    }
-
-    function cancelPrint() {
-      selectedPrintItem = null;
-      document.getElementById('batch-print-box').classList.add('hidden');
-    }
-
-    function executeBatchPrint() {
-      if (!selectedPrintItem) return;
-
-      const count = parseInt(document.getElementById('print-count').value) || 24;
-      const printContainer = document.getElementById('print-page-a4');
-      printContainer.innerHTML = '';
-
-      for (let i = 0; i < count; i++) {
-        const svgId = `print-svg-${i}`;
-        const cardHtml = `
-          <div class="label-card">
-            <div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">${selectedPrintItem.name}</div>
-            <svg id="${svgId}"></svg>
-            <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${selectedPrintItem.price.toLocaleString()} تومان</div>
-          </div>
-        `;
-        printContainer.innerHTML += cardHtml;
-      }
-
-      for (let i = 0; i < count; i++) {
-        JsBarcode(`#print-svg-${i}`, selectedPrintItem.barcode, {
-          format: "CODE128",
-          width: 1.5,
-          height: 35,
-          displayValue: true,
-          fontSize: 10
-        });
-      }
-
-      printContainer.classList.remove('hidden');
-      window.print();
-      printContainer.classList.add('hidden');
-    }
-
-    function changeQty(amount) {
-      const qtyInput = document.getElementById('quantity');
-      let currentVal = parseInt(qtyInput.value) || 1;
-      currentVal += amount;
-      if (currentVal < 1) currentVal = 1;
-      qtyInput.value = currentVal;
-    }
-
-    function switchTab(tab) {
-      initAudio();
-      document.getElementById('tab-scan').classList.add('hidden');
-      document.getElementById('tab-manage').classList.add('hidden');
-      document.getElementById('tab-print').classList.add('hidden');
-      document.getElementById('tab-scan-btn').className = "flex-1 py-2 font-bold text-gray-500";
-      document.getElementById('tab-manage-btn').className = "flex-1 py-2 font-bold text-gray-500";
-      document.getElementById('tab-print-btn').className = "flex-1 py-2 font-bold text-gray-500";
-
-      if (tab === 'scan') {
-        document.getElementById('tab-scan').classList.remove('hidden');
-        document.getElementById('tab-scan-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600";
-        isProcessingScan = false;
-        try { html5QrCode.resume(); } catch(e){}
-      } else if (tab === 'manage') {
-        document.getElementById('tab-manage').classList.remove('hidden');
-        document.getElementById('tab-manage-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600";
-        renderProductsList();
-      } else if (tab === 'print') {
-        document.getElementById('tab-print').classList.remove('hidden');
-        document.getElementById('tab-print-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600";
-        renderGeneratedBarcodesList();
-      }
-    }
-
-    function renderGeneratedBarcodesList() {
-      const listEl = document.getElementById('generated-barcodes-list');
-      const keys = Object.keys(database).filter(b => b.startsWith('90'));
-
-      if (keys.length === 0) {
-        listEl.innerHTML = '<p class="text-center text-xs text-gray-400 py-4">هنوز هیچ بارکد تولیدی ثبت نشده است.</p>';
-        return;
-      }
-
-      listEl.innerHTML = '';
-      keys.forEach((barcode) => {
-        const item = database[barcode];
-        const svgId = `barcode-svg-${barcode}`;
-        listEl.innerHTML += `
-          <div class="p-3 bg-white rounded-xl border border-gray-200 text-center shadow-sm">
-            <div class="flex justify-between items-center text-xs mb-1">
-              <span class="font-bold text-gray-800">${item.name}</span>
-              <span class="text-blue-600 font-semibold">${item.price.toLocaleString()} تومان</span>
-            </div>
-            <div class="flex justify-center py-1 overflow-hidden">
-              <svg id="${svgId}"></svg>
-            </div>
-            <button onclick="printGeneratedBarcode('${barcode}')" class="w-full mt-2 bg-blue-50 text-blue-600 hover:bg-blue-100 py-1.5 rounded-lg text-xs font-bold transition">
-              🖨️ چاپ برگه A4
-            </button>
-          </div>
-        `;
-      });
-
-      keys.forEach((barcode) => {
-        try {
-          JsBarcode(`#barcode-svg-${barcode}`, barcode, {
-            format: "CODE128",
-            width: 1.5,
-            height: 35,
-            displayValue: true,
-            fontSize: 10
-          });
-        } catch(e){}
-      });
-    }
-
-    function printGeneratedBarcode(barcode) {
-      selectedPrintItem = { barcode: barcode, ...database[barcode] };
-      executeBatchPrint();
-    }
-
-    function addToCart() {
-      if (!currentProduct) return;
-      const qty = parseInt(document.getElementById('quantity').value) || 1;
-      cart.push({ name: currentProduct.name, price: currentProduct.price, quantity: qty, total: currentProduct.price * qty });
-      updateCartUI();
-      document.getElementById('product-info').classList.add('hidden');
-      document.getElementById('quantity').value = 1;
-      currentProduct = null;
-      isProcessingScan = false;
-      try { html5QrCode.resume(); } catch(e){}
-    }
-
-    function updateCartUI() {
-      const cartList = document.getElementById('cart-list');
-      const totalPriceEl = document.getElementById('total-price');
-      if (cart.length === 0) {
-        cartList.innerHTML = '<li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>';
-        totalPriceEl.innerText = "0";
-        return;
-      }
-      cartList.innerHTML = '';
-      let sum = 0;
-      cart.forEach((item, index) => {
-        sum += item.total;
-        cartList.innerHTML += `
-          <li class="py-2 flex justify-between items-center">
-            <div>
-              <span class="font-medium text-gray-800">${item.name}</span>
-              <span class="text-xs text-gray-400 block">${item.quantity} عدد × ${item.price.toLocaleString()}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="font-semibold">${item.total.toLocaleString()} تومان</span>
-              <button onclick="removeFromCart(${index})" class="text-red-500 font-bold px-1 text-xs">✕</button>
-            </div>
-          </li>`;
-      });
-      totalPriceEl.innerText = sum.toLocaleString();
-    }
-
-    function removeFromCart(index) {
-      cart.splice(index, 1);
-      updateCartUI();
-    }
-
-    function exportCSV() {
-      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-      Object.keys(database).forEach(barcode => {
-        const item = database[barcode];
-        csvContent += `${barcode},${item.name},${item.price}\n`;
-      });
-      const link = document.createElement("a");
-      link.setAttribute("href", encodeURI(csvContent));
-      link.setAttribute("download", "grocery_products.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    function renderProductsList() {
-      const listEl = document.getElementById('products-list');
-      const keys = Object.keys(database);
-      document.getElementById('products-count').innerText = keys.length;
-
-      if (keys.length === 0) {
-        listEl.innerHTML = '<p class="text-center text-xs text-gray-400 py-2">هیچ کالایی ثبت نشده است.</p>';
-        return;
-      }
-
-      listEl.innerHTML = '';
-      keys.forEach((barcode) => {
-        const item = database[barcode];
-        const isGenerated = barcode.startsWith('90'); // فقط بارکدهای تولیدی خود برنامه
-        listEl.innerHTML += `
-          <div class="flex justify-between items-center p-2 bg-white rounded border text-xs">
-            <div>
-              <p class="font-bold text-gray-800">${item.name}</p>
-              <p class="text-gray-400 dir-ltr text-right">${barcode} - ${item.price.toLocaleString()} تومان</p>
-            </div>
-            <div class="flex gap-1">
-              ${isGenerated ? `<button onclick="prepareBatchPrint('${barcode}')" class="text-blue-600 bg-blue-50 px-2 py-1 rounded font-bold">🖨️ چاپ A4</button>` : ''}
-              <button onclick="deleteProduct('${barcode}')" class="text-red-500 bg-red-50 px-2 py-1 rounded">حذف</button>
-            </div>
-          </div>
-        `;
-      });
-    }
-
-    async function deleteProduct(barcode) {
-      if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
-        delete database[barcode];
-        localStorage.setItem('grocery_db', JSON.stringify(database));
-        renderProductsList();
-        await saveDatabaseToCloudflare();
-      }
-    }
-
-    async function sendToTelegram() {
-      if (cart.length === 0) { alert("سبد خرید خالی است!"); return; }
-
-      const sendBtn = document.getElementById('send-btn');
-      sendBtn.disabled = true;
-      sendBtn.innerText = "در حال ارسال...";
-
-      let text = "🛒 <b>فاکتور جدید خرید</b>\n\n";
-      let totalSum = 0;
-      cart.forEach((item, i) => {
-        text += `${i + 1}. <b>${item.name}</b>\n   تعداد: ${item.quantity} | قیمت: ${item.total.toLocaleString()} تومان\n`;
-        totalSum += item.total;
-      });
-      text += `\n💰 <b>جمع کل: ${totalSum.toLocaleString()} تومان</b>`;
-
-      try {
-        const response = await fetch(WORKER_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            action: "send_invoice",
-            password: sessionStorage.getItem('app_pass'),
-            message: text 
-          })
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.ok) {
-          alert("فاکتور با موفقیت به تلگرام ارسال شد!");
-          cart = [];
-          updateCartUI();
-        } else {
-          alert("خطا در ارسال به تلگرام.");
-        }
-      } catch (err) {
-        alert("ارتباط با Worker تلگرام برقرار نشد.");
-        console.error("Error sending message:", err);
-      } finally {
-        sendBtn.disabled = false;
-        sendBtn.innerText = "ارسال فاکتور به تلگرام";
-      }
-    }
-
-    window.addEventListener('DOMContentLoaded', checkAuthOnLoad);
-  </script>
-</body>
-</html>
