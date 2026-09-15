@@ -49,12 +49,37 @@
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-3 md:p-6 font-sans select-none">
-  <div class="max-w-md mx-auto bg-white rounded-2xl shadow-md overflow-hidden p-5">
+
+  <!-- ==================== صفحه ورود با رمز عبور ==================== -->
+  <div id="login-screen" class="fixed inset-0 bg-gray-900/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full text-center border border-gray-100">
+      <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
+        🔒
+      </div>
+      <h2 class="font-bold text-gray-800 text-xl mb-1">ورود به سیستم فروش</h2>
+      <p class="text-xs text-gray-500 mb-6">لطفا رمز عبور مدیریت را وارد کنید</p>
+      
+      <form onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <input type="password" id="app-password" placeholder="رمز عبور" class="w-full text-center tracking-widest text-lg py-3 px-4 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dir-ltr bg-gray-50 transition" required>
+        </div>
+        <p id="login-error" class="text-xs text-red-500 hidden font-bold">رمز عبور اشتباه است!</p>
+        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-500/30">
+          ورود به برنامه
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== محتوای اصلی برنامه ==================== -->
+  <div id="main-app" class="max-w-md mx-auto bg-white rounded-2xl shadow-md overflow-hidden p-5 hidden">
     
-    <!-- هدر بالای صفحه و خروج -->
+    <!-- هدر و دکمه خروج -->
     <div class="flex justify-between items-center mb-3 pb-2 border-b">
-      <span class="text-xs font-bold text-gray-500">سیستم مدیریت و فروش</span>
-      <button onclick="logout()" class="text-xs text-red-500 hover:text-red-700 font-bold bg-red-50 px-2 py-1 rounded-lg border border-red-100">🔒 خروج / تغییر رمز</button>
+      <span class="text-xs font-bold text-gray-400">سیستم مدیریت و اسکن بارکد</span>
+      <button onclick="handleLogout()" class="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1 bg-red-50 px-2.5 py-1 rounded-lg transition">
+        🚪 خروج
+      </button>
     </div>
 
     <!-- تب‌های بالای صفحه -->
@@ -98,12 +123,7 @@
 
       <!-- سبد خرید -->
       <div class="border-t pt-4">
-        <div class="flex justify-between items-center mb-2">
-          <h3 class="font-bold text-gray-700">اقلام فاکتور:</h3>
-          <button id="clear-cart-btn" onclick="clearCart()" class="hidden text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-2.5 py-1 rounded-lg transition border border-red-200">
-            🗑️ پاک کردن کل فاکتور
-          </button>
-        </div>
+        <h3 class="font-bold text-gray-700 mb-2">اقلام فاکتور:</h3>
         <ul id="cart-list" class="divide-y divide-gray-100 text-sm text-gray-600 mb-4 min-h-[50px]">
           <li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>
         </ul>
@@ -204,10 +224,13 @@
   <div id="print-page-a4" class="hidden"></div>
 
   <script>
+    // ⚠️ آدرس Worker اختصاصی خود را وارد کنید
     const WORKER_URL = "https://godrati.ez-1332d6.workers.dev";
-    let appPassword = localStorage.getItem('app_password') || '';
+    
+    // 🔑 رمز عبور ورود به برنامه (در صورت نیاز آن را تغییر دهید)
+    const APP_PASSWORD = "1234";
 
-    let database = {};
+    let database = JSON.parse(localStorage.getItem('grocery_db')) || {};
     let currentProduct = null;
     let selectedPrintItem = null;
     let tempBarcode = "";
@@ -216,103 +239,46 @@
     let isTorchOn = false;
     let isProcessingScan = false;
 
-    // --- توابع تولید صدا ---
-    function playSuccessSound() {
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(800, ctx.currentTime);
-        gain.gain.setValueAtTime(0.2, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.15);
-      } catch(e) {}
-    }
+    // --- مدیریت احراز هویت (رمز عبور) ---
+    function handleLogin(event) {
+      event.preventDefault();
+      const inputPass = document.getElementById('app-password').value;
+      const errorEl = document.getElementById('login-error');
 
-    function playErrorSound() {
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const playBeep = (time, freq) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(freq, time);
-          gain.gain.setValueAtTime(0.2, time);
-          gain.gain.exponentialRampToValueAtTime(0.01, time + 0.12);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.12);
-        };
-        playBeep(ctx.currentTime, 220);
-        playBeep(ctx.currentTime + 0.15, 180);
-      } catch(e) {}
-    }
-
-    // --- مدیریت رمز عبور ---
-    function checkPassword() {
-      if (!appPassword) {
-        appPassword = prompt("لطفاً رمز ورود به سیستم را وارد کنید:");
-        if (appPassword) {
-          localStorage.setItem('app_password', appPassword);
-        } else {
-          alert("برای استفاده از برنامه باید رمز ورود را وارد کنید.");
-          return false;
-        }
+      if (inputPass === APP_PASSWORD) {
+        sessionStorage.setItem('is_logged_in', 'true');
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('main-app').classList.remove('hidden');
+        errorEl.classList.add('hidden');
+        startScanner();
+      } else {
+        errorEl.classList.remove('hidden');
+        document.getElementById('app-password').value = '';
       }
-      return true;
     }
 
-    function logout() {
-      localStorage.removeItem('app_password');
-      appPassword = '';
-      location.reload();
-    }
-
-    // --- توابع ارتباط با کلودفلر KV ---
-    async function fetchDatabaseFromCloud() {
-      if (!appPassword) return;
-
-      try {
-        const res = await fetch(`${WORKER_URL}/products`, {
-          headers: { "Authorization": appPassword }
+    function handleLogout() {
+      sessionStorage.removeItem('is_logged_in');
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          location.reload();
+        }).catch(() => {
+          location.reload();
         });
-        if (res.ok) {
-          database = await res.json();
-        } else if (res.status === 401) {
-          alert("رمز عبور اشتباه است.");
-          logout();
-        }
-      } catch (err) {
-        console.error("خطا در دریافت دیتابیس:", err);
+      } else {
+        location.reload();
       }
     }
 
-    async function saveDatabaseToCloud() {
-      if (!appPassword) return;
-
-      try {
-        const res = await fetch(`${WORKER_URL}/products`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": appPassword
-          },
-          body: JSON.stringify(database)
-        });
-        if (res.status === 401) {
-          alert("رمز عبور اشتباه است.");
-          logout();
-        }
-      } catch (err) {
-        console.error("خطا در ذخیره دیتابیس:", err);
+    function checkAuthOnLoad() {
+      if (sessionStorage.getItem('is_logged_in') === 'true') {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('main-app').classList.remove('hidden');
+        startScanner();
       }
     }
 
+    // --- تنظیمات اسکنر ---
     const scanConfig = {
       fps: 15,
       qrbox: { width: 260, height: 160 },
@@ -329,6 +295,8 @@
     };
 
     function startScanner() {
+      if (html5QrCode) return; // از دوباره اجرا شدن اسکنر جلوگیری می‌کند
+
       html5QrCode = new Html5Qrcode("reader");
       html5QrCode.start(
         { facingMode: "environment" },
@@ -345,25 +313,21 @@
       html5QrCode.applyVideoConstraints({ advanced: [{ torch: isTorchOn }] });
     }
 
-    async function onScanSuccess(decodedText) {
+    function onScanSuccess(decodedText) {
       if (isProcessingScan) return;
 
       isProcessingScan = true;
       try { html5QrCode.pause(); } catch(e){}
 
-      await fetchDatabaseFromCloud();
-
       const product = database[decodedText];
 
       if (product) {
-        playSuccessSound();
         currentProduct = { barcode: decodedText, ...product };
         document.getElementById('product-name').innerText = product.name;
         document.getElementById('product-price').innerText = product.price.toLocaleString();
         document.getElementById('quantity').value = 1;
         document.getElementById('product-info').classList.remove('hidden');
       } else {
-        playErrorSound();
         tempBarcode = decodedText;
         document.getElementById('modal-barcode').innerText = decodedText;
         document.getElementById('unknown-modal').classList.remove('hidden');
@@ -401,7 +365,7 @@
       document.getElementById('new-barcode').value = uniqueCode;
     }
 
-    async function saveProduct() {
+    function saveProduct() {
       const barcode = document.getElementById('new-barcode').value.trim();
       const name = document.getElementById('new-name').value.trim();
       const price = parseInt(document.getElementById('new-price').value);
@@ -412,7 +376,7 @@
       }
 
       database[barcode] = { name: name, price: price };
-      await saveDatabaseToCloud();
+      localStorage.setItem('grocery_db', JSON.stringify(database));
       
       document.getElementById('new-barcode').value = '';
       document.getElementById('new-name').value = '';
@@ -475,7 +439,7 @@
       qtyInput.value = currentVal;
     }
 
-    async function switchTab(tab) {
+    function switchTab(tab) {
       if (tab === 'scan') {
         document.getElementById('tab-scan').classList.remove('hidden');
         document.getElementById('tab-manage').classList.add('hidden');
@@ -488,7 +452,6 @@
         document.getElementById('tab-manage').classList.remove('hidden');
         document.getElementById('tab-manage-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600";
         document.getElementById('tab-scan-btn').className = "flex-1 py-2 font-bold text-gray-500";
-        await fetchDatabaseFromCloud();
         renderProductsList();
       }
     }
@@ -508,16 +471,11 @@
     function updateCartUI() {
       const cartList = document.getElementById('cart-list');
       const totalPriceEl = document.getElementById('total-price');
-      const clearCartBtn = document.getElementById('clear-cart-btn');
-
       if (cart.length === 0) {
         cartList.innerHTML = '<li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>';
         totalPriceEl.innerText = "0";
-        clearCartBtn.classList.add('hidden');
         return;
       }
-
-      clearCartBtn.classList.remove('hidden');
       cartList.innerHTML = '';
       let sum = 0;
       cart.forEach((item, index) => {
@@ -530,7 +488,7 @@
             </div>
             <div class="flex items-center gap-2">
               <span class="font-semibold">${item.total.toLocaleString()} تومان</span>
-              <button onclick="removeFromCart(${index})" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-1.5 rounded-lg font-bold text-xs transition" title="حذف کالا">✕</button>
+              <button onclick="removeFromCart(${index})" class="text-red-500 font-bold px-1 text-xs">✕</button>
             </div>
           </li>`;
       });
@@ -538,18 +496,8 @@
     }
 
     function removeFromCart(index) {
-      const item = cart[index];
-      if (confirm(`آیا از حذف "${item.name}" از فاکتور مطمئن هستید؟`)) {
-        cart.splice(index, 1);
-        updateCartUI();
-      }
-    }
-
-    function clearCart() {
-      if (confirm("آیا مطمئن هستید که می‌خواهید تمام اقلام فاکتور را پاک کنید؟")) {
-        cart = [];
-        updateCartUI();
-      }
+      cart.splice(index, 1);
+      updateCartUI();
     }
 
     function exportCSV() {
@@ -594,10 +542,10 @@
       });
     }
 
-    async function deleteProduct(barcode) {
+    function deleteProduct(barcode) {
       if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
         delete database[barcode];
-        await saveDatabaseToCloud();
+        localStorage.setItem('grocery_db', JSON.stringify(database));
         renderProductsList();
       }
     }
@@ -618,12 +566,9 @@
       text += `\n💰 <b>جمع کل: ${totalSum.toLocaleString()} تومان</b>`;
 
       try {
-        const response = await fetch(`${WORKER_URL}/telegram`, {
+        const response = await fetch(WORKER_URL, {
           method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": appPassword 
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: text })
         });
 
@@ -639,18 +584,14 @@
       } catch (err) {
         alert("ارتباط با Worker تلگرام برقرار نشد.");
         console.error("Error sending message:", err);
-      } finally {
+      } font-bold {
         sendBtn.disabled = false;
         sendBtn.innerText = "ارسال فاکتور به تلگرام";
       }
     }
 
-    window.addEventListener('DOMContentLoaded', async () => {
-      if (checkPassword()) {
-        await fetchDatabaseFromCloud();
-        startScanner();
-      }
-    });
+    // برسی اولیه در زمان لود شدن صفحه
+    window.addEventListener('DOMContentLoaded', checkAuthOnLoad);
   </script>
 </body>
 </html>
