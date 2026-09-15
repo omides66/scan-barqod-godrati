@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main  # اگر نام شاخه اصلی شما master است، این را به master تغییر دهید
+      - main
 
 permissions:
   contents: read
@@ -23,14 +23,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Inject Secrets into HTML
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: |
-          sed -i "s/__BOT_TOKEN__/$BOT_TOKEN/g" index.html
-          sed -i "s/__CHAT_ID__/$CHAT_ID/g" index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
