@@ -3,55 +3,53 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>سیستم فروش و مدیریت شبکه ای مغازه</title>
+  <title>سیستم فروش و مدیریت بارکد</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
   <style>
     input[type=number]::-webkit-inner-spin-button, 
-    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-    input[type=number] { -moz-appearance: textfield; }
-    #reader video { object-fit: cover !important; border-radius: 0.75rem; }
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; 
+      margin: 0; 
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+    #reader video {
+      object-fit: cover !important;
+      border-radius: 0.75rem;
+    }
     
     @media print {
-      body * { visibility: hidden; }
-      #print-page-a4, #print-page-a4 * { visibility: visible; }
-      #print-page-a4 { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
-      @page { size: A4 portrait; margin: 8mm; }
-      .a4-page {
-        width: 100%; height: 275mm; display: grid !important;
-        grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(8, 1fr);
-        gap: 4mm; box-sizing: border-box; page-break-after: always; break-after: page;
+      body * {
+        visibility: hidden;
       }
-      .a4-page:last-child { page-break-after: auto; break-after: auto; }
+      #print-page-a4, #print-page-a4 * {
+        visibility: visible;
+      }
+      #print-page-a4 {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        padding: 10px;
+      }
       .label-card {
-        border: 1px dashed #bbb; padding: 4px; text-align: center; border-radius: 6px;
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        overflow: hidden; box-sizing: border-box;
+        border: 1px dashed #bbb;
+        padding: 6px;
+        text-align: center;
+        page-break-inside: avoid;
+        border-radius: 6px;
       }
-      .label-card svg { max-width: 95%; max-height: 60%; }
     }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-3 md:p-6 font-sans select-none">
-
-  <!-- ==================== صفحه ورود با رمز عبور ==================== -->
-  <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
-      <div class="text-4xl mb-3">🔐</div>
-      <h2 class="font-bold text-gray-800 text-xl mb-1">ورود فروشندگان</h2>
-      <p class="text-xs text-gray-500 mb-4">جهت دسترسی به لیست محصولات رمز عبور را وارد کنید</p>
-      
-      <input type="password" id="app-password" placeholder="رمز عبور" class="w-full text-center text-lg p-3 border rounded-xl mb-3 outline-none focus:border-blue-600 font-mono">
-      <button onclick="login()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition">
-        ورود به برنامه
-      </button>
-      <p id="login-error" class="text-xs text-red-500 font-bold mt-3 hidden">رمز عبور نادرست است!</p>
-    </div>
-  </div>
-
-  <!-- ==================== بدنه اصلی برنامه ==================== -->
-  <div id="main-app" class="max-w-md mx-auto bg-white rounded-2xl shadow-md overflow-hidden p-5 hidden">
+  <div class="max-w-md mx-auto bg-white rounded-2xl shadow-md overflow-hidden p-5">
     
     <!-- تب‌های بالای صفحه -->
     <div class="flex border-b mb-4">
@@ -94,7 +92,12 @@
 
       <!-- سبد خرید -->
       <div class="border-t pt-4">
-        <h3 class="font-bold text-gray-700 mb-2">اقلام فاکتور:</h3>
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="font-bold text-gray-700">اقلام فاکتور:</h3>
+          <button id="clear-cart-btn" onclick="clearCart()" class="hidden text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-2.5 py-1 rounded-lg transition border border-red-200">
+            🗑️ پاک کردن کل فاکتور
+          </button>
+        </div>
         <ul id="cart-list" class="divide-y divide-gray-100 text-sm text-gray-600 mb-4 min-h-[50px]">
           <li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>
         </ul>
@@ -112,190 +115,126 @@
 
     <!-- ==================== بخش مدیریت اجناس ==================== -->
     <div id="tab-manage" class="hidden">
-      <!-- ثبت کالا -->
+      <!-- ثبت تکی کالا / تولید بارکد جدید -->
       <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4">
-        <h3 class="font-bold text-gray-800 mb-3 text-sm">ثبت کالا (با بارکد دستی یا تولید خودکار)</h3>
+        <h3 class="font-bold text-gray-800 mb-3 text-sm">ثبت کالا (با بارکد یا تولید خودکار)</h3>
         <div class="space-y-3">
           <div>
             <label class="text-xs text-gray-600 block mb-1">کد بارکد:</label>
             <div class="flex gap-2">
-              <input type="text" id="new-barcode" placeholder="بارکد کالا" class="flex-1 p-2 border rounded-lg text-sm dir-ltr">
+              <input type="text" id="new-barcode" placeholder="بارکد یا کد تولیدی" class="flex-1 p-2 border rounded-lg text-sm dir-ltr">
               <button onclick="generateRandomBarcode()" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-xs font-bold transition">
-                ⚡ تولید بارکد (۹۰)
+                ⚡ تولید کد
               </button>
             </div>
           </div>
 
           <div>
             <label class="text-xs text-gray-600 block mb-1">نام کالا:</label>
-            <input type="text" id="new-name" placeholder="مثلاً: روغن مایع ۱ لیتر" class="w-full p-2 border rounded-lg text-sm">
+            <input type="text" id="new-name" placeholder="مثلاً: حبوبات (بسته ۱ کیلویی)" class="w-full p-2 border rounded-lg text-sm">
           </div>
 
           <div>
             <label class="text-xs text-gray-600 block mb-1">قیمت (تومان):</label>
-            <input type="text" id="new-price" oninput="formatPriceInput(this)" placeholder="مثلاً: ۶۵,۰۰۰" class="w-full p-2 border rounded-lg text-sm dir-ltr text-right">
+            <input type="number" id="new-price" placeholder="مثلاً: 45000" class="w-full p-2 border rounded-lg text-sm">
           </div>
 
-          <button id="save-btn" onclick="saveProduct()" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-700 transition">
-            ذخیره کالا در سرور ابری
+          <button onclick="saveProduct()" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-700 transition">
+            ذخیره کالا در سیستم
           </button>
         </div>
       </div>
 
-      <!-- زیربرگه‌ها برای تفکیک همه محصولات و چاپ بارکد سیستم -->
-      <div class="border-t pt-3">
-        <div class="flex bg-gray-100 p-1 rounded-xl mb-3 text-xs font-bold">
-          <button id="subtab-all-btn" onclick="switchSubTab('all')" class="flex-1 py-1.5 rounded-lg bg-white shadow-sm text-blue-600">
-            همه کالاها (<span id="all-count">0</span>)
+      <!-- تنظیمات چاپ چندتایی لیبل روی A4 -->
+      <div id="batch-print-box" class="bg-blue-50 p-4 rounded-xl border border-blue-200 mb-4 hidden">
+        <h3 class="font-bold text-blue-900 text-sm mb-2">🖨️ تنظیمات چاپ چندتایی روی برگه A4</h3>
+        <p id="selected-print-title" class="text-xs text-blue-700 mb-2"></p>
+        
+        <div class="flex items-center gap-2 mb-3">
+          <label class="text-xs text-gray-700 font-bold">تعداد برچسب روی A4:</label>
+          <input type="number" id="print-count" value="24" min="1" max="60" class="w-16 p-1 border rounded text-center text-sm font-bold">
+        </div>
+
+        <div class="flex gap-2">
+          <button onclick="executeBatchPrint()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-blue-700">
+            چاپ برگه A4
           </button>
-          <button id="subtab-print-btn" onclick="switchSubTab('print')" class="flex-1 py-1.5 rounded-lg text-gray-500">
-            🖨️ چاپ بارکد سیستم (<span id="system-count">0</span>)
+          <button onclick="cancelPrint()" class="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs">
+            انصراف
           </button>
         </div>
+      </div>
 
-        <!-- لیست ۱: تمامی اجناس -->
-        <div id="subtab-all-content">
-          <div id="all-products-list" class="space-y-2 max-h-72 overflow-y-auto"></div>
+      <!-- لیست کالاهای ذخیره‌شده -->
+      <div>
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="font-bold text-gray-700 text-sm">لیست اجناس (<span id="products-count">0</span> کالا):</h3>
+          <button onclick="exportCSV()" class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300">دانلود خروجی اکسل</button>
         </div>
-
-        <!-- لیست ۲: مخصوص چاپ بارکدهای سیستمی -->
-        <div id="subtab-print-content" class="hidden">
-          <div class="flex justify-between items-center bg-blue-50 p-2.5 rounded-xl border border-blue-100 mb-3">
-            <label class="flex items-center gap-1.5 text-xs font-bold text-blue-900 cursor-pointer">
-              <input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this.checked)" class="w-4 h-4 rounded text-blue-600">
-              <span>انتخاب همه</span>
-            </label>
-
-            <button onclick="executeMultiPrint()" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition shadow">
-              🖨️ چاپ A4 موارد انتخابی
-            </button>
-          </div>
-          <div id="system-products-list" class="space-y-2 max-h-72 overflow-y-auto"></div>
-        </div>
+        <div id="products-list" class="space-y-2 max-h-60 overflow-y-auto"></div>
       </div>
     </div>
 
   </div>
 
-  <!-- پاپ‌آپ ثبت کالای ناشناخته -->
+  <!-- پاپ‌آپ مدال ثبت کالای ناشناخته -->
   <div id="unknown-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
     <div class="bg-white rounded-2xl p-5 max-w-sm w-full text-center shadow-xl">
       <div class="text-3xl mb-2">⚠️</div>
       <h3 class="font-bold text-gray-800 text-lg mb-2">کالای ناشناخته</h3>
-      <p class="text-sm text-gray-600 mb-4">بارکد <span id="modal-barcode" class="font-bold font-mono text-blue-600"></span> در سیستم پیدا نشد.</p>
+      <p class="text-sm text-gray-600 mb-4">بارکد <span id="modal-barcode" class="font-bold font-mono text-blue-600"></span> در سیستم پیدا نشد. آیا می‌خواهید آن را ثبت کنید؟</p>
       <div class="flex gap-2">
         <button onclick="goToRegisterProduct()" class="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700">
           ثبت کالا
         </button>
         <button onclick="closeUnknownModal()" class="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-xl font-bold text-sm hover:bg-gray-300">
-          بستن
+          بستن و اسکن مجدد
         </button>
       </div>
     </div>
   </div>
 
-  <!-- منطقه مخصوص ساخت و چاپ برگه A4 -->
+  <!-- منطقه مخصوص چاپ برگه A4 -->
   <div id="print-page-a4" class="hidden"></div>
 
   <script>
+    // ⚠️ آدرس Worker اختصاصی خود را وارد کنید
     const WORKER_URL = "https://godrati.ez-1332d6.workers.dev";
-    let userPassword = "";
-    let database = {};
+
+    let database = JSON.parse(localStorage.getItem('grocery_db')) || {};
     let currentProduct = null;
+    let selectedPrintItem = null;
     let tempBarcode = "";
     let cart = [];
     let html5QrCode = null;
     let isTorchOn = false;
     let isProcessingScan = false;
 
-    // ۱. ورود به سیستم و تایید رمز عبور
-    async function login() {
-      const passInput = document.getElementById('app-password').value.trim();
-      if (!passInput) return;
-
-      try {
-        const res = await fetch(`${WORKER_URL}/products`, {
-          headers: { "Authorization": passInput }
-        });
-
-        if (res.status === 401) {
-          document.getElementById('login-error').classList.remove('hidden');
-          return;
-        }
-
-        userPassword = passInput;
-        database = await res.json();
-        
-        document.getElementById('login-screen').classList.add('hidden');
-        document.getElementById('main-app').classList.remove('hidden');
-        
-        startScanner();
-      } catch (e) {
-        alert("خطا در ارتباط با سرور. اینترنت خود را بررسی کنید.");
-      }
-    }
-
-    // ۲. دریافت آخرین اطلاعات از سرور ابری
-    async function fetchDatabaseFromCloud() {
-      try {
-        const res = await fetch(`${WORKER_URL}/products`, {
-          headers: { "Authorization": userPassword }
-        });
-        if (res.ok) {
-          database = await res.json();
-        }
-      } catch (e) {
-        console.error("خطا در همگام‌سازی:", e);
-      }
-    }
-
-    // ۳. ارسال اطلاعات جدید به سرور ابری
-    async function saveDatabaseToCloud() {
-      try {
-        await fetch(`${WORKER_URL}/products`, {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": userPassword
-          },
-          body: JSON.stringify(database)
-        });
-      } catch (e) {
-        alert("خطا در ذخیره ابری اطلاعات!");
-      }
-    }
-
-    function toEnglishDigits(str) {
-      return str.replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
-    }
-
-    function formatPriceInput(input) {
-      let value = toEnglishDigits(input.value).replace(/\D/g, '');
-      input.value = value ? Number(value).toLocaleString('en-US') : '';
-    }
-
-    function getCleanPrice(inputValue) {
-      const cleanValue = toEnglishDigits(inputValue).replace(/,/g, '').trim();
-      return parseInt(cleanValue, 10);
-    }
-
     const scanConfig = {
-      fps: 15, qrbox: { width: 260, height: 160 }, aspectRatio: 1.0,
+      fps: 15,
+      qrbox: { width: 260, height: 160 },
+      aspectRatio: 1.0,
       experimentalFeatures: { useBarCodeDetectorIfSupported: true },
       formatsToSupport: [
-        Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.CODE_39
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_39
       ]
     };
 
     function startScanner() {
       html5QrCode = new Html5Qrcode("reader");
-      html5QrCode.start({ facingMode: "environment" }, scanConfig, onScanSuccess)
-      .then(() => {
+      html5QrCode.start(
+        { facingMode: "environment" },
+        scanConfig,
+        onScanSuccess
+      ).then(() => {
         const capabilities = html5QrCode.getRunningTrackCapabilities();
         if (capabilities.torch) document.getElementById('torch-btn').classList.remove('hidden');
-      }).catch(err => console.error("خطا دوربین:", err));
+      }).catch(err => console.error("خطا در دوربین:", err));
     }
 
     function toggleTorch() {
@@ -303,12 +242,12 @@
       html5QrCode.applyVideoConstraints({ advanced: [{ torch: isTorchOn }] });
     }
 
-    async function onScanSuccess(decodedText) {
-      if (isProcessingScan) return;
-      isProcessingScan = true;
-      try { html5QrCode.pause(); } catch(e){}
+    function onScanSuccess(decodedText) {
+      if (isProcessingScan) return; // اگر در حال پردازش اسکن قبلی است، اسکن جدید انجام نشود
 
-      await fetchDatabaseFromCloud(); // بررسی جدیدترین اجناس ثبت شده توسط سایر فروشندگان
+      isProcessingScan = true;
+      try { html5QrCode.pause(); } catch(e){} // متوقف کردن اسکنر
+
       const product = database[decodedText];
 
       if (product) {
@@ -355,157 +294,67 @@
       document.getElementById('new-barcode').value = uniqueCode;
     }
 
-    async function saveProduct() {
+    function saveProduct() {
       const barcode = document.getElementById('new-barcode').value.trim();
       const name = document.getElementById('new-name').value.trim();
-      const price = getCleanPrice(document.getElementById('new-price').value);
+      const price = parseInt(document.getElementById('new-price').value);
 
       if (!barcode || !name || isNaN(price)) {
         alert("لطفاً تمامی فیلدها را به درستی وارد کنید.");
         return;
       }
 
-      const saveBtn = document.getElementById('save-btn');
-      saveBtn.disabled = true;
-      saveBtn.innerText = "در حال ذخیره‌سازی ابری...";
-
       database[barcode] = { name: name, price: price };
-      await saveDatabaseToCloud();
+      localStorage.setItem('grocery_db', JSON.stringify(database));
       
       document.getElementById('new-barcode').value = '';
       document.getElementById('new-name').value = '';
       document.getElementById('new-price').value = '';
-      
-      saveBtn.disabled = false;
-      saveBtn.innerText = "ذخیره کالا در سرور ابری";
-
-      alert("محصول همگام‌سازی شد.");
       renderProductsList();
+      
+      // بازگشت به تب اسکن و فعال‌سازی مجدد دوربین
       switchTab('scan');
     }
 
-    function switchSubTab(sub) {
-      if (sub === 'all') {
-        document.getElementById('subtab-all-content').classList.remove('hidden');
-        document.getElementById('subtab-print-content').classList.add('hidden');
-        document.getElementById('subtab-all-btn').className = "flex-1 py-1.5 rounded-lg bg-white shadow-sm text-blue-600 font-bold";
-        document.getElementById('subtab-print-btn').className = "flex-1 py-1.5 rounded-lg text-gray-500 font-bold";
-      } else {
-        document.getElementById('subtab-all-content').classList.add('hidden');
-        document.getElementById('subtab-print-content').classList.remove('hidden');
-        document.getElementById('subtab-print-btn').className = "flex-1 py-1.5 rounded-lg bg-white shadow-sm text-blue-600 font-bold";
-        document.getElementById('subtab-all-btn').className = "flex-1 py-1.5 rounded-lg text-gray-500 font-bold";
-      }
+    function prepareBatchPrint(barcode) {
+      selectedPrintItem = { barcode: barcode, ...database[barcode] };
+      document.getElementById('selected-print-title').innerText = `کالا: ${selectedPrintItem.name} (${selectedPrintItem.price.toLocaleString()} تومان)`;
+      document.getElementById('batch-print-box').classList.remove('hidden');
     }
 
-    function toggleSelectAll(isChecked) {
-      document.querySelectorAll('.item-cb').forEach(cb => cb.checked = isChecked);
+    function cancelPrint() {
+      selectedPrintItem = null;
+      document.getElementById('batch-print-box').classList.add('hidden');
     }
 
-    function changePrintCount(barcode, delta) {
-      const input = document.getElementById(`print-count-${barcode}`);
-      let val = (parseInt(input.value) || 1) + delta;
-      if (val < 1) val = 1;
-      input.value = val;
-    }
+    function executeBatchPrint() {
+      if (!selectedPrintItem) return;
 
-    async function renderProductsList() {
-      await fetchDatabaseFromCloud();
-      const allBarcodes = Object.keys(database);
-      const systemBarcodes = allBarcodes.filter(b => b.startsWith('90'));
-
-      document.getElementById('all-count').innerText = allBarcodes.length;
-      document.getElementById('system-count').innerText = systemBarcodes.length;
-
-      const allListEl = document.getElementById('all-products-list');
-      allListEl.innerHTML = allBarcodes.length === 0 ? '<p class="text-center text-xs text-gray-400 py-3">هیچ کالایی یافت نشد.</p>' : '';
-      
-      allBarcodes.forEach(barcode => {
-        const item = database[barcode];
-        allListEl.innerHTML += `
-          <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200 text-xs shadow-sm">
-            <div>
-              <p class="font-bold text-gray-800">${item.name}</p>
-              <p class="text-gray-400 dir-ltr text-right font-mono">${barcode} - ${item.price.toLocaleString()} تومان</p>
-            </div>
-            <button onclick="deleteProduct('${barcode}')" class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition">🗑️</button>
-          </div>`;
-      });
-
-      const sysListEl = document.getElementById('system-products-list');
-      sysListEl.innerHTML = systemBarcodes.length === 0 ? '<p class="text-center text-xs text-gray-400 py-3">هیچ کالا با بارکد سیستمی (۹۰) یافت نشد.</p>' : '';
-      
-      systemBarcodes.forEach(barcode => {
-        const item = database[barcode];
-        sysListEl.innerHTML += `
-          <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200 text-xs shadow-sm">
-            <div class="flex items-center gap-2">
-              <input type="checkbox" value="${barcode}" class="item-cb w-4 h-4 rounded text-blue-600 cursor-pointer">
-              <div>
-                <p class="font-bold text-gray-800">${item.name}</p>
-                <p class="text-gray-400 dir-ltr text-right font-mono">${barcode} - ${item.price.toLocaleString()} تومان</p>
-              </div>
-            </div>
-            <div class="flex items-center border border-gray-300 rounded-lg bg-gray-50 overflow-hidden">
-              <button onclick="changePrintCount('${barcode}', -1)" class="w-6 h-6 bg-gray-200 hover:bg-gray-300 font-bold text-gray-700 flex items-center justify-center">-</button>
-              <input type="number" id="print-count-${barcode}" value="1" min="1" readonly class="w-8 text-center font-bold bg-transparent outline-none text-xs text-blue-700">
-              <button onclick="changePrintCount('${barcode}', 1)" class="w-6 h-6 bg-gray-200 hover:bg-gray-300 font-bold text-gray-700 flex items-center justify-center">+</button>
-            </div>
-          </div>`;
-      });
-    }
-
-    async function deleteProduct(barcode) {
-      if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
-        delete database[barcode];
-        await saveDatabaseToCloud();
-        renderProductsList();
-      }
-    }
-
-    function executeMultiPrint() {
-      const checkboxes = document.querySelectorAll('.item-cb:checked');
-      if (checkboxes.length === 0) { alert("لطفاً حداقل یک کالا را انتخاب کنید."); return; }
-
-      const allBarcodesToPrint = [];
-      checkboxes.forEach(cb => {
-        const barcode = cb.value;
-        const count = parseInt(document.getElementById(`print-count-${barcode}`).value) || 1;
-        if (database[barcode]) {
-          for (let i = 0; i < count; i++) {
-            allBarcodesToPrint.push({ barcode, name: database[barcode].name, price: database[barcode].price });
-          }
-        }
-      });
-
+      const count = parseInt(document.getElementById('print-count').value) || 24;
       const printContainer = document.getElementById('print-page-a4');
       printContainer.innerHTML = '';
-      const ITEMS_PER_PAGE = 24;
-      let currentPage = null;
-      const svgTasks = [];
 
-      allBarcodesToPrint.forEach((item, index) => {
-        if (index % ITEMS_PER_PAGE === 0) {
-          currentPage = document.createElement('div');
-          currentPage.className = 'a4-page';
-          printContainer.appendChild(currentPage);
-        }
-
-        const svgId = `multi-print-svg-${index}`;
-        const card = document.createElement('div');
-        card.className = 'label-card';
-        card.innerHTML = `
-          <div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">${item.name}</div>
-          <svg id="${svgId}"></svg>
-          <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${item.price.toLocaleString()} تومان</div>
+      for (let i = 0; i < count; i++) {
+        const svgId = `print-svg-${i}`;
+        const cardHtml = `
+          <div class="label-card">
+            <div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">${selectedPrintItem.name}</div>
+            <svg id="${svgId}"></svg>
+            <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${selectedPrintItem.price.toLocaleString()} تومان</div>
+          </div>
         `;
-        currentPage.appendChild(card);
-        svgTasks.push({ id: svgId, barcode: item.barcode });
-      });
+        printContainer.innerHTML += cardHtml;
+      }
 
-      svgTasks.forEach(task => {
-        JsBarcode(`#${task.id}`, task.barcode, { format: "CODE128", width: 1.5, height: 38, displayValue: true, fontSize: 10 });
-      });
+      for (let i = 0; i < count; i++) {
+        JsBarcode(`#print-svg-${i}`, selectedPrintItem.barcode, {
+          format: "CODE128",
+          width: 1.5,
+          height: 35,
+          displayValue: true,
+          fontSize: 10
+        });
+      }
 
       printContainer.classList.remove('hidden');
       window.print();
@@ -514,7 +363,8 @@
 
     function changeQty(amount) {
       const qtyInput = document.getElementById('quantity');
-      let currentVal = (parseInt(qtyInput.value) || 1) + amount;
+      let currentVal = parseInt(qtyInput.value) || 1;
+      currentVal += amount;
       if (currentVal < 1) currentVal = 1;
       qtyInput.value = currentVal;
     }
@@ -551,11 +401,16 @@
     function updateCartUI() {
       const cartList = document.getElementById('cart-list');
       const totalPriceEl = document.getElementById('total-price');
+      const clearCartBtn = document.getElementById('clear-cart-btn');
+
       if (cart.length === 0) {
         cartList.innerHTML = '<li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>';
         totalPriceEl.innerText = "0";
+        clearCartBtn.classList.add('hidden');
         return;
       }
+
+      clearCartBtn.classList.remove('hidden');
       cartList.innerHTML = '';
       let sum = 0;
       cart.forEach((item, index) => {
@@ -568,7 +423,7 @@
             </div>
             <div class="flex items-center gap-2">
               <span class="font-semibold">${item.total.toLocaleString()} تومان</span>
-              <button onclick="removeFromCart(${index})" class="text-red-500 font-bold px-1 text-xs">✕</button>
+              <button onclick="removeFromCart(${index})" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-1.5 rounded-lg font-bold text-xs transition" title="حذف کالا">✕</button>
             </div>
           </li>`;
       });
@@ -576,8 +431,68 @@
     }
 
     function removeFromCart(index) {
-      cart.splice(index, 1);
-      updateCartUI();
+      const item = cart[index];
+      if (confirm(`آیا از حذف "${item.name}" از فاکتور مطمئن هستید؟`)) {
+        cart.splice(index, 1);
+        updateCartUI();
+      }
+    }
+
+    function clearCart() {
+      if (confirm("آیا مطمئن هستید که می‌خواهید تمام اقلام فاکتور را پاک کنید؟")) {
+        cart = [];
+        updateCartUI();
+      }
+    }
+
+    function exportCSV() {
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+      Object.keys(database).forEach(barcode => {
+        const item = database[barcode];
+        csvContent += `${barcode},${item.name},${item.price}\n`;
+      });
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI(csvContent));
+      link.setAttribute("download", "grocery_products.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function renderProductsList() {
+      const listEl = document.getElementById('products-list');
+      const keys = Object.keys(database);
+      document.getElementById('products-count').innerText = keys.length;
+
+      if (keys.length === 0) {
+        listEl.innerHTML = '<p class="text-center text-xs text-gray-400 py-2">هیچ کالایی ثبت نشده است.</p>';
+        return;
+      }
+
+      listEl.innerHTML = '';
+      keys.forEach((barcode) => {
+        const item = database[barcode];
+        listEl.innerHTML += `
+          <div class="flex justify-between items-center p-2 bg-white rounded border text-xs">
+            <div>
+              <p class="font-bold text-gray-800">${item.name}</p>
+              <p class="text-gray-400 dir-ltr text-right">${barcode} - ${item.price.toLocaleString()} تومان</p>
+            </div>
+            <div class="flex gap-1">
+              <button onclick="prepareBatchPrint('${barcode}')" class="text-blue-600 bg-blue-50 px-2 py-1 rounded font-bold">🖨️ چاپ A4</button>
+              <button onclick="deleteProduct('${barcode}')" class="text-red-500 bg-red-50 px-2 py-1 rounded">حذف</button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    function deleteProduct(barcode) {
+      if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
+        delete database[barcode];
+        localStorage.setItem('grocery_db', JSON.stringify(database));
+        renderProductsList();
+      }
     }
 
     async function sendToTelegram() {
@@ -596,30 +511,31 @@
       text += `\n💰 <b>جمع کل: ${totalSum.toLocaleString()} تومان</b>`;
 
       try {
-        const response = await fetch(`${WORKER_URL}/telegram`, {
+        const response = await fetch(WORKER_URL, {
           method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": userPassword
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: text })
         });
 
         const data = await response.json();
+
         if (response.ok && data.ok) {
           alert("فاکتور با موفقیت به تلگرام ارسال شد!");
           cart = [];
           updateCartUI();
         } else {
-          alert("خطا در ارسال به تلگرام.");
+          alert("خطا در ارسال به تلگرام. تنظیمات Worker را بررسی کنید.");
         }
       } catch (err) {
-        alert("ارتباط با سرور برقرار نشد.");
+        alert("ارتباط با Worker تلگرام برقرار نشد.");
+        console.error("Error sending message:", err);
       } finally {
         sendBtn.disabled = false;
         sendBtn.innerText = "ارسال فاکتور به تلگرام";
       }
     }
+
+    window.addEventListener('DOMContentLoaded', startScanner);
   </script>
 </body>
 </html>
