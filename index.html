@@ -198,10 +198,11 @@
   <div id="print-page-a4" class="hidden"></div>
 
   <script>
-    // ⚠️ آدرس Worker اختصاصی خود را وارد کنید
+    // ⚠️ آدرس Worker و رمز ورود خود را تنظیم کنید
     const WORKER_URL = "https://godrati.ez-1332d6.workers.dev";
+    const APP_PASSWORD = "1234"; // هم‌نام با متغیر APP_PASSWORD در کلودفلر
 
-    let database = JSON.parse(localStorage.getItem('grocery_db')) || {};
+    let database = {};
     let currentProduct = null;
     let selectedPrintItem = null;
     let tempBarcode = "";
@@ -209,6 +210,74 @@
     let html5QrCode = null;
     let isTorchOn = false;
     let isProcessingScan = false;
+
+    // --- توابع تولید صدا ---
+    function playSuccessSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, ctx.currentTime);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+      } catch(e) {}
+    }
+
+    function playErrorSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const playBeep = (time, freq) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq, time);
+          gain.gain.setValueAtTime(0.2, time);
+          gain.gain.exponentialRampToValueAtTime(0.01, time + 0.12);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + 0.12);
+        };
+        playBeep(ctx.currentTime, 220);
+        playBeep(ctx.currentTime + 0.15, 180);
+      } catch(e) {}
+    }
+
+    // --- توابع ارتباط با کلودفلر KV ---
+    async function fetchDatabaseFromCloud() {
+      try {
+        const res = await fetch(`${WORKER_URL}/products`, {
+          headers: { "Authorization": APP_PASSWORD }
+        });
+        if (res.ok) {
+          database = await res.json();
+        } else if (res.status === 401) {
+          alert("رمز عبور اشتباه است یا در کلودفلر تنظیم نشده است.");
+        }
+      } catch (err) {
+        console.error("خطا در دریافت دیتابیس:", err);
+      }
+    }
+
+    async function saveDatabaseToCloud() {
+      try {
+        await fetch(`${WORKER_URL}/products`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": APP_PASSWORD
+          },
+          body: JSON.stringify(database)
+        });
+      } catch (err) {
+        console.error("خطا در ذخیره دیتابیس:", err);
+      }
+    }
 
     const scanConfig = {
       fps: 15,
@@ -242,21 +311,26 @@
       html5QrCode.applyVideoConstraints({ advanced: [{ torch: isTorchOn }] });
     }
 
-    function onScanSuccess(decodedText) {
-      if (isProcessingScan) return; // اگر در حال پردازش اسکن قبلی است، اسکن جدید انجام نشود
+    async function onScanSuccess(decodedText) {
+      if (isProcessingScan) return;
 
       isProcessingScan = true;
-      try { html5QrCode.pause(); } catch(e){} // متوقف کردن اسکنر
+      try { html5QrCode.pause(); } catch(e){}
+
+      // به روزرسانی همزمان محصولات از کلودفلر
+      await fetchDatabaseFromCloud();
 
       const product = database[decodedText];
 
       if (product) {
+        playSuccessSound(); // 🔊 صدای تایید کالا
         currentProduct = { barcode: decodedText, ...product };
         document.getElementById('product-name').innerText = product.name;
         document.getElementById('product-price').innerText = product.price.toLocaleString();
         document.getElementById('quantity').value = 1;
         document.getElementById('product-info').classList.remove('hidden');
       } else {
+        playErrorSound(); // 🔊 صدای اخطار کالا
         tempBarcode = decodedText;
         document.getElementById('modal-barcode').innerText = decodedText;
         document.getElementById('unknown-modal').classList.remove('hidden');
@@ -294,7 +368,7 @@
       document.getElementById('new-barcode').value = uniqueCode;
     }
 
-    function saveProduct() {
+    async function saveProduct() {
       const barcode = document.getElementById('new-barcode').value.trim();
       const name = document.getElementById('new-name').value.trim();
       const price = parseInt(document.getElementById('new-price').value);
@@ -305,14 +379,13 @@
       }
 
       database[barcode] = { name: name, price: price };
-      localStorage.setItem('grocery_db', JSON.stringify(database));
+      await saveDatabaseToCloud(); // ذخیره مستقیم در KV کلودفلر
       
       document.getElementById('new-barcode').value = '';
       document.getElementById('new-name').value = '';
       document.getElementById('new-price').value = '';
       renderProductsList();
       
-      // بازگشت به تب اسکن و فعال‌سازی مجدد دوربین
       switchTab('scan');
     }
 
@@ -369,7 +442,7 @@
       qtyInput.value = currentVal;
     }
 
-    function switchTab(tab) {
+    async function switchTab(tab) {
       if (tab === 'scan') {
         document.getElementById('tab-scan').classList.remove('hidden');
         document.getElementById('tab-manage').classList.add('hidden');
@@ -382,6 +455,7 @@
         document.getElementById('tab-manage').classList.remove('hidden');
         document.getElementById('tab-manage-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600";
         document.getElementById('tab-scan-btn').className = "flex-1 py-2 font-bold text-gray-500";
+        await fetchDatabaseFromCloud();
         renderProductsList();
       }
     }
@@ -487,10 +561,10 @@
       });
     }
 
-    function deleteProduct(barcode) {
+    async function deleteProduct(barcode) {
       if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
         delete database[barcode];
-        localStorage.setItem('grocery_db', JSON.stringify(database));
+        await saveDatabaseToCloud();
         renderProductsList();
       }
     }
@@ -511,9 +585,12 @@
       text += `\n💰 <b>جمع کل: ${totalSum.toLocaleString()} تومان</b>`;
 
       try {
-        const response = await fetch(WORKER_URL, {
+        const response = await fetch(`${WORKER_URL}/telegram`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": APP_PASSWORD 
+          },
           body: JSON.stringify({ message: text })
         });
 
@@ -535,7 +612,10 @@
       }
     }
 
-    window.addEventListener('DOMContentLoaded', startScanner);
+    window.addEventListener('DOMContentLoaded', async () => {
+      await fetchDatabaseFromCloud();
+      startScanner();
+    });
   </script>
 </body>
 </html>
