@@ -163,7 +163,6 @@
 
           <div>
             <label class="text-xs text-gray-600 block mb-1">قیمت (تومان):</label>
-            <!-- فیلد قیمت با جداسازی خودکار سه رقم سه رقم -->
             <input type="text" id="new-price" oninput="formatPriceInput(this)" placeholder="مثلاً: 45,000" class="w-full p-2 border rounded-lg text-sm dir-ltr text-right">
           </div>
 
@@ -205,7 +204,6 @@
 
     <!-- ==================== بخش چاپ بارکدها ==================== -->
     <div id="tab-print" class="hidden">
-      <!-- ابزار انتخاب تکی یا همگانی و چاپ جمعی روی A4 -->
       <div class="bg-blue-50 border border-blue-200 p-3 rounded-xl mb-3">
         <div class="flex justify-between items-center mb-2">
           <span class="font-bold text-blue-900 text-xs sm:text-sm">🖨️ چاپ سفارشی برچسب‌های ۹۰...</span>
@@ -260,7 +258,6 @@
     let isProcessingScan = false;
     let audioCtx = null;
 
-    // تابع فرمت جداکننده ۳ رقم ۳ رقم برای ورودی قیمت
     function formatPriceInput(input) {
       var val = input.value.replace(/,/g, '').replace(/[^\d]/g, '');
       if (val) {
@@ -270,7 +267,6 @@
       }
     }
 
-    // توابع پخش صدای بیپ بدون نیاز به فایل خارجی
     function initAudio() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -310,7 +306,6 @@
       } catch(e){}
     }
 
-    // همگام‌سازی دیتابیس با کلادفلر KV
     async function syncDatabaseWithCloudflare() {
       const pass = sessionStorage.getItem('app_pass');
       try {
@@ -346,7 +341,6 @@
       }
     }
 
-    // بررسی رمز عبور با ارسال به کلادفلر
     async function handleLogin(event) {
       event.preventDefault();
       initAudio();
@@ -404,7 +398,6 @@
       }
     }
 
-    // تنظیمات اسکنر
     const scanConfig = {
       fps: 15,
       qrbox: { width: 260, height: 160 },
@@ -496,7 +489,6 @@
     async function saveProduct() {
       const barcode = document.getElementById('new-barcode').value.trim();
       const name = document.getElementById('new-name').value.trim();
-      // تمیز کردن کاماها قبل از تبدیل به عدد
       const rawPrice = document.getElementById('new-price').value.replace(/,/g, '');
       const price = parseInt(rawPrice);
 
@@ -603,7 +595,6 @@
       }
     }
 
-    // ==================== مدیریت چاپ سفارشی بارکدهای ۹۰ ====================
     function changePrintItemQty(barcode, delta) {
       var qtyInput = document.getElementById('qty-' + barcode);
       var chk = document.getElementById('chk-' + barcode);
@@ -779,176 +770,4 @@
 
     function addToCart() {
       if (!currentProduct) return;
-      const qty = parseInt(document.getElementById('quantity').value) || 1;
-      cart.push({ name: currentProduct.name, price: currentProduct.price, quantity: qty, total: currentProduct.price * qty });
-      updateCartUI();
-      document.getElementById('product-info').classList.add('hidden');
-      document.getElementById('quantity').value = 1;
-      currentProduct = null;
-      isProcessingScan = false;
-      try { html5QrCode.resume(); } catch(e){}
-    }
-
-    function updateCartUI() {
-      const cartList = document.getElementById('cart-list');
-      const totalPriceEl = document.getElementById('total-price');
-      if (cart.length === 0) {
-        cartList.innerHTML = '<li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>';
-        totalPriceEl.innerText = "0";
-        return;
-      }
-      cartList.innerHTML = '';
-      let sum = 0;
-      cart.forEach((item, index) => {
-        sum += item.total;
-        cartList.innerHTML += `
-          <li class="py-2 flex justify-between items-center">
-            <div>
-              <span class="font-medium text-gray-800">${item.name}</span>
-              <span class="text-xs text-gray-400 block">${item.quantity} عدد × ${item.price.toLocaleString()}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="font-semibold">${item.total.toLocaleString()} تومان</span>
-              <button onclick="removeFromCart(${index})" class="text-red-500 font-bold px-1 text-xs">✕</button>
-            </div>
-          </li>`;
-      });
-      totalPriceEl.innerText = sum.toLocaleString();
-    }
-
-    function removeFromCart(index) {
-      cart.splice(index, 1);
-      updateCartUI();
-    }
-
-    function exportCSV() {
-      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-      Object.keys(database).forEach(barcode => {
-        const item = database[barcode];
-        csvContent += `${barcode},${item.name},${item.price}\n`;
-      });
-      const link = document.createElement("a");
-      link.setAttribute("href", encodeURI(csvContent));
-      link.setAttribute("download", "grocery_products.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    function renderProductsList() {
-      const listEl = document.getElementById('products-list');
-      const keys = Object.keys(database);
-      document.getElementById('products-count').innerText = keys.length;
-
-      if (keys.length === 0) {
-        listEl.innerHTML = '<p class="text-center text-xs text-gray-400 py-2">هیچ کالایی ثبت نشده است.</p>';
-        return;
-      }
-
-      listEl.innerHTML = '';
-      keys.forEach((barcode) => {
-        const item = database[barcode];
-        const isGenerated = barcode.startsWith('90');
-        listEl.innerHTML += `
-          <div class="flex justify-between items-center p-2 bg-white rounded border text-xs">
-            <div>
-              <p class="font-bold text-gray-800">${item.name}</p>
-              <p class="text-gray-400 dir-ltr text-right">${barcode} - ${item.price.toLocaleString()} تومان</p>
-            </div>
-            <div class="flex gap-1">
-              ${isGenerated ? `<button onclick="prepareBatchPrint('${barcode}')" class="text-blue-600 bg-blue-50 px-2 py-1 rounded font-bold">🖨️ چاپ A4</button>` : ''}
-              <button onclick="deleteProduct('${barcode}')" class="text-red-500 bg-red-50 px-2 py-1 rounded">حذف</button>
-            </div>
-          </div>
-        `;
-      });
-    }
-
-    async function deleteProduct(barcode) {
-      if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
-        delete database[barcode];
-        localStorage.setItem('grocery_db', JSON.stringify(database));
-        renderProductsList();
-        await saveDatabaseToCloudflare();
-      }
-    }
-
-    // تابع ارسال فاکتور جدولی به تلگرام
-    async function sendToTelegram() {
-      if (cart.length === 0) { alert("سبد خرید خالی است!"); return; }
-
-      const sendBtn = document.getElementById('send-btn');
-      sendBtn.disabled = true;
-      sendBtn.innerText = "در حال ارسال...";
-
-      // تاریخ و ساعت
-      var now = new Date();
-      var dateStr = now.toLocaleDateString('fa-IR');
-      var timeStr = now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
-
-      // کادربندی جدول مخصوص تلگرام (استفاده از تگ pre برای چینش ستونی)
-      var text = "🧾 <b>فاکتور جدید فروشگاه</b>\n";
-      text += "📅 تاریخ: " + dateStr + " — " + timeStr + "\n";
-      text += "━━━━━━━━━━━━━━━━━━━━\n";
-      text += "<pre>\n";
-      text += "┌───┬────────────────┬───┬──────────┐\n";
-      text += "│ # │ نام کالا       │تعداد│ مبلغ(تومان)│\n";
-      text += "├───┼────────────────┼───┼──────────┤\n";
-
-      var totalSum = 0;
-      var totalItemsCount = 0;
-
-      for (var i = 0; i < cart.length; i++) {
-        var item = cart[i];
-        totalSum += item.total;
-        totalItemsCount += item.quantity;
-
-        var rowNum = (i + 1).toString().padEnd(2, ' ');
-        // کوتاه کردن نام کالا تا ۱۴ کاراکتر برای حفظ تناسب جدول
-        var nameCut = item.name.length > 14 ? item.name.substring(0, 12) + '..' : item.name;
-        var namePadded = nameCut.padEnd(14, ' ');
-        var qtyPadded = item.quantity.toString().padStart(2, ' ');
-        var priceFormatted = item.total.toLocaleString().padStart(9, ' ');
-
-        text += "│" + rowNum + "│" + namePadded + "│" + qtyPadded + "│" + priceFormatted + "│\n";
-      }
-
-      text += "└───┴────────────────┴───┴──────────┘\n";
-      text += "</pre>\n";
-      text += "💰 <b>جمع کل فاکتور: " + totalSum.toLocaleString() + " تومان</b>\n";
-      text += "📦 <b>تعداد اقلام: " + totalItemsCount + " عدد</b>\n";
-      text += "━━━━━━━━━━━━━━━━━━━━";
-
-      try {
-        const response = await fetch(WORKER_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            action: "send_invoice",
-            password: sessionStorage.getItem('app_pass'),
-            message: text 
-          })
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.ok) {
-          alert("فاکتور با موفقیت به تلگرام ارسال شد!");
-          cart = [];
-          updateCartUI();
-        } else {
-          alert("خطا در ارسال به تلگرام.");
-        }
-      } catch (err) {
-        alert("ارتباط با Worker تلگرام برقرار نشد.");
-        console.error("Error sending message:", err);
-      } finally {
-        sendBtn.disabled = false;
-        sendBtn.innerText = "ارسال فاکتور به تلگرام";
-      }
-    }
-
-    window.addEventListener('DOMContentLoaded', checkAuthOnLoad);
-  </script>
-</body>
-</html>
+      const
