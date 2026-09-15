@@ -7,7 +7,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
-    /* حذف فلش‌های پیش‌فرض مرورگر روی ورودی عددی */
     input[type=number]::-webkit-inner-spin-button, 
     input[type=number]::-webkit-outer-spin-button { 
       -webkit-appearance: none; 
@@ -15,6 +14,11 @@
     }
     input[type=number] {
       -moz-appearance: textfield;
+    }
+    /* استایل سفارشی برای منطقه اسکنر */
+    #reader video {
+      object-fit: cover !important;
+      border-radius: 0.75rem;
     }
   </style>
 </head>
@@ -29,14 +33,20 @@
 
     <!-- ==================== بخش فروش و اسکن ==================== -->
     <div id="tab-scan">
-      <div id="reader" class="w-full rounded-lg border overflow-hidden mb-4"></div>
+      <!-- بخش اسکنر با طراحی بهینه‌شده -->
+      <div class="relative mb-4">
+        <div id="reader" class="w-full rounded-xl border overflow-hidden bg-black min-h-[220px]"></div>
+        <button id="torch-btn" onclick="toggleTorch()" class="hidden absolute top-3 left-3 bg-white/80 backdrop-blur-md text-gray-800 p-2 rounded-lg text-xs font-bold shadow z-10 flex items-center gap-1">
+          🔦 چراغ‌قوه
+        </button>
+      </div>
 
       <!-- اطلاعات محصول اسکن شده -->
-      <div id="product-info" class="hidden bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4">
+      <div id="product-info" class="hidden bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4 animate-fade-in">
         <h2 id="product-name" class="font-bold text-gray-800 text-lg mb-1"></h2>
         <p class="text-sm text-gray-600 mb-3">قیمت واحد: <span id="product-price" class="font-semibold text-blue-600"></span> تومان</p>
         
-        <!-- کنترل تعداد با دکمه‌های بزرگ + و - -->
+        <!-- کنترل تعداد -->
         <div class="flex items-center justify-between gap-2 mb-3">
           <span class="text-sm font-medium text-gray-700">تعداد / مقدار:</span>
           
@@ -130,11 +140,56 @@
     let lastScannedBarcode = "";
     let currentProduct = null;
     let cart = [];
+    let html5QrCode = null;
+    let isTorchOn = false;
 
-    const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 220 });
-    html5QrcodeScanner.render(onScanSuccess);
+    // تنظیمات فوق‌العاده سریع اسکنر
+    const scanConfig = {
+      fps: 30, // افزایش تعداد فریم‌ها برای اسکن آنی
+      qrbox: { width: 260, height: 160 }, // کادر مستطیلی متناسب با بارکد‌های خطی
+      aspectRatio: 1.0,
+      experimentalFeatures: {
+        useBarCodeDetectorIfSupported: true // استفاده از پردازنده سخت‌افزاری گوشی در صورت پشتیبانی
+      },
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_39
+      ]
+    };
+
+    function startScanner() {
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" }, // اجبار به استفاده از دوربین اصلی پشت
+        scanConfig,
+        onScanSuccess
+      ).then(() => {
+        // بررسی پشتیبانی گوشی از چراغ‌قوه
+        const capabilities = html5QrCode.getRunningTrackCapabilities();
+        if (capabilities.torch) {
+          document.getElementById('torch-btn').classList.remove('hidden');
+        }
+      }).catch(err => {
+        console.error("خطا در باز کردن دوربین:", err);
+      });
+    }
+
+    function toggleTorch() {
+      isTorchOn = !isTorchOn;
+      html5QrCode.applyVideoConstraints({
+        advanced: [{ torch: isTorchOn }]
+      });
+    }
 
     function onScanSuccess(decodedText) {
+      if (lastScannedBarcode === decodedText && !document.getElementById('product-info').classList.contains('hidden')) {
+        return; // جلوگیری از اسکن مکرر یک کالا در چند میلی‌ثانیه
+      }
+
       lastScannedBarcode = decodedText;
       const product = database[decodedText];
 
@@ -142,7 +197,7 @@
         currentProduct = { barcode: decodedText, ...product };
         document.getElementById('product-name').innerText = product.name;
         document.getElementById('product-price').innerText = product.price.toLocaleString();
-        document.getElementById('quantity').value = 1; // ریست تعداد به ۱
+        document.getElementById('quantity').value = 1;
         document.getElementById('product-info').classList.remove('hidden');
       } else {
         alert("بارکد اسکن شد: " + decodedText + "\nاین کالا هنوز ثبت نشده است.");
@@ -150,7 +205,6 @@
       }
     }
 
-    // تغییر تعداد با دکمه‌های + و -
     function changeQty(amount) {
       const qtyInput = document.getElementById('quantity');
       let currentVal = parseInt(qtyInput.value) || 1;
@@ -347,6 +401,9 @@
       })
       .catch(() => alert("ارتباط با تلگرام برقرار نشد."));
     }
+
+    // شروع بکار خودکار اسکنر به محض بارگذاری صفحه
+    window.addEventListener('DOMContentLoaded', startScanner);
   </script>
 </body>
 </html>
