@@ -60,8 +60,12 @@
       <p class="text-xs text-gray-500 mb-6">لطفا رمز عبور مدیریت را وارد کنید</p>
       
       <form onsubmit="handleLogin(event)" class="space-y-4">
-        <div>
-          <input type="password" id="app-password" placeholder="رمز عبور" class="w-full text-center tracking-widest text-lg py-3 px-4 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dir-ltr bg-gray-50 transition" required>
+        <!-- فیلد رمز عبور همراه با آیکون چشم -->
+        <div class="relative flex items-center">
+          <input type="password" id="app-password" placeholder="رمز عبور" class="w-full text-center tracking-widest text-lg py-3 px-10 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dir-ltr bg-gray-50 transition" required>
+          <button type="button" onclick="togglePasswordVisibility()" class="absolute left-3 text-gray-400 hover:text-gray-600 focus:outline-none p-1 text-xl cursor-pointer" title="نمایش/مخفی کردن رمز">
+            <span id="eye-icon">👁️</span>
+          </button>
         </div>
         <p id="login-error" class="text-xs text-red-500 hidden font-bold">رمز عبور اشتباه است یا خطایی رخ داده!</p>
         <button type="submit" id="login-btn" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-500/30">
@@ -258,6 +262,7 @@
     let isProcessingScan = false;
     let audioCtx = null;
 
+    // تابع فرمت جداکننده ۳ رقم ۳ رقم برای ورودی قیمت
     function formatPriceInput(input) {
       var val = input.value.replace(/,/g, '').replace(/[^\d]/g, '');
       if (val) {
@@ -267,6 +272,7 @@
       }
     }
 
+    // توابع پخش صدای بیپ بدون نیاز به فایل خارجی
     function initAudio() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -306,6 +312,7 @@
       } catch(e){}
     }
 
+    // همگام‌سازی دیتابیس با کلادفلر KV
     async function syncDatabaseWithCloudflare() {
       const pass = sessionStorage.getItem('app_pass');
       try {
@@ -341,10 +348,30 @@
       }
     }
 
+    // تغییر وضعیت نمایش / مخفی‌سازی رمز با آیکون چشم
+    function togglePasswordVisibility() {
+      var passInput = document.getElementById('app-password');
+      var eyeIcon = document.getElementById('eye-icon');
+      if (passInput.type === 'password') {
+        passInput.type = 'text';
+        eyeIcon.innerText = '🙈';
+      } else {
+        passInput.type = 'password';
+        eyeIcon.innerText = '👁️';
+      }
+    }
+
+    // بررسی رمز عبور با ارسال به کلادفلر
     async function handleLogin(event) {
       event.preventDefault();
       initAudio();
-      const inputPass = document.getElementById('app-password').value;
+      const rawPass = document.getElementById('app-password').value;
+      // تبدیل خودکار ارقام فارسی یا عربی به انگلیسی و حذف فاصله‌های ناخواسته
+      const inputPass = rawPass.replace(/[۰-۹]/g, function(d) {
+        return "۰۱۲۳۴۵۶۷۸۹".indexOf(d);
+      }).replace(/[٠-٩]/g, function(d) {
+        return "٠١٢٣٤٥٦٧٨٩".indexOf(d);
+      }).trim();
       const errorEl = document.getElementById('login-error');
       const loginBtn = document.getElementById('login-btn');
 
@@ -398,6 +425,7 @@
       }
     }
 
+    // تنظیمات اسکنر
     const scanConfig = {
       fps: 15,
       qrbox: { width: 260, height: 160 },
@@ -595,6 +623,7 @@
       }
     }
 
+    // ==================== مدیریت چاپ سفارشی بارکدهای ۹۰ ====================
     function changePrintItemQty(barcode, delta) {
       var qtyInput = document.getElementById('qty-' + barcode);
       var chk = document.getElementById('chk-' + barcode);
@@ -770,4 +799,171 @@
 
     function addToCart() {
       if (!currentProduct) return;
-      const
+      const qty = parseInt(document.getElementById('quantity').value) || 1;
+      cart.push({ name: currentProduct.name, price: currentProduct.price, quantity: qty, total: currentProduct.price * qty });
+      updateCartUI();
+      document.getElementById('product-info').classList.add('hidden');
+      document.getElementById('quantity').value = 1;
+      currentProduct = null;
+      isProcessingScan = false;
+      try { html5QrCode.resume(); } catch(e){}
+    }
+
+    function updateCartUI() {
+      const cartList = document.getElementById('cart-list');
+      const totalPriceEl = document.getElementById('total-price');
+      if (cart.length === 0) {
+        cartList.innerHTML = '<li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>';
+        totalPriceEl.innerText = "0";
+        return;
+      }
+      cartList.innerHTML = '';
+      let sum = 0;
+      cart.forEach((item, index) => {
+        sum += item.total;
+        cartList.innerHTML += `
+          <li class="py-2 flex justify-between items-center">
+            <div>
+              <span class="font-medium text-gray-800">${item.name}</span>
+              <span class="text-xs text-gray-400 block">${item.quantity} عدد × ${Number(item.price).toLocaleString()}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="font-semibold">${Number(item.total).toLocaleString()} تومان</span>
+              <button onclick="removeFromCart(${index})" class="text-red-500 font-bold px-1 text-xs">✕</button>
+            </div>
+          </li>`;
+      });
+      totalPriceEl.innerText = sum.toLocaleString();
+    }
+
+    function removeFromCart(index) {
+      cart.splice(index, 1);
+      updateCartUI();
+    }
+
+    function exportCSV() {
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+      Object.keys(database).forEach(barcode => {
+        const item = database[barcode];
+        csvContent += `${barcode},${item.name},${item.price}\n`;
+      });
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI(csvContent));
+      link.setAttribute("download", "grocery_products.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function renderProductsList() {
+      const listEl = document.getElementById('products-list');
+      const keys = Object.keys(database);
+      document.getElementById('products-count').innerText = keys.length;
+
+      if (keys.length === 0) {
+        listEl.innerHTML = '<p class="text-center text-xs text-gray-400 py-2">هیچ کالایی ثبت نشده است.</p>';
+        return;
+      }
+
+      listEl.innerHTML = '';
+      keys.forEach((barcode) => {
+        const item = database[barcode];
+        const isGenerated = barcode.startsWith('90');
+        listEl.innerHTML += `
+          <div class="flex justify-between items-center p-2 bg-white rounded border text-xs">
+            <div>
+              <p class="font-bold text-gray-800">${item.name}</p>
+              <p class="text-gray-400 dir-ltr text-right">${barcode} - ${item.price.toLocaleString()} تومان</p>
+            </div>
+            <div class="flex gap-1">
+              ${isGenerated ? `<button onclick="prepareBatchPrint('${barcode}')" class="text-blue-600 bg-blue-50 px-2 py-1 rounded font-bold">🖨️ چاپ A4</button>` : ''}
+              <button onclick="deleteProduct('${barcode}')" class="text-red-500 bg-red-50 px-2 py-1 rounded">حذف</button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    async function deleteProduct(barcode) {
+      if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
+        delete database[barcode];
+        localStorage.setItem('grocery_db', JSON.stringify(database));
+        renderProductsList();
+        await saveDatabaseToCloudflare();
+      }
+    }
+
+    // ارسال فاکتور رسید دیجیتال به تلگرام
+    async function sendToTelegram() {
+      if (cart.length === 0) { alert("سبد خرید خالی است!"); return; }
+
+      const sendBtn = document.getElementById('send-btn');
+      sendBtn.disabled = true;
+      sendBtn.innerText = "در حال ارسال...";
+
+      // تاریخ و ساعت به وقت ایران
+      var now = new Date();
+      var dateStr = now.toLocaleDateString('fa-IR');
+      var timeStr = now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+
+      var totalSum = 0;
+      var totalItemsCount = 0;
+
+      var text = "🧾 <b>فاکتور جدید فروشگاه</b>\n";
+      text += "📅 تاریخ: <code>" + dateStr + "</code> — ساعت: <code>" + timeStr + "</code>\n";
+      text += "━━━━━━━━━━━━━━━━━━━━\n\n";
+
+      for (var i = 0; i < cart.length; i++) {
+        var item = cart[i];
+        totalSum += item.total;
+        totalItemsCount += item.quantity;
+
+        var unitPrice = item.price.toLocaleString();
+        var totalPrice = item.total.toLocaleString();
+
+        text += (i + 1) + "️⃣ <b>" + item.name + "</b>\n";
+        text += "▫️ " + item.quantity + " عدد × " + unitPrice + " = <b>" + totalPrice + " تومان</b>\n";
+
+        if (i < cart.length - 1) {
+          text += "────────────────────\n";
+        }
+      }
+
+      text += "\n━━━━━━━━━━━━━━━━━━━━\n";
+      text += "📦 <b>تعداد کل اقلام:</b> " + totalItemsCount + " عدد\n";
+      text += "💰 <b>جمع کل فاکتور:</b> <b>" + totalSum.toLocaleString() + " تومان</b>\n";
+      text += "━━━━━━━━━━━━━━━━━━━━";
+
+      try {
+        const response = await fetch(WORKER_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            action: "send_invoice",
+            password: sessionStorage.getItem('app_pass'),
+            message: text 
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.ok) {
+          alert("فاکتور با موفقیت به تلگرام ارسال شد!");
+          cart = [];
+          updateCartUI();
+        } else {
+          alert("خطا در ارسال به تلگرام.");
+        }
+      } catch (err) {
+        alert("ارتباط با Worker تلگرام برقرار نشد.");
+        console.error("Error sending message:", err);
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.innerText = "ارسال فاکتور به تلگرام";
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', checkAuthOnLoad);
+  </script>
+</body>
+</html>
