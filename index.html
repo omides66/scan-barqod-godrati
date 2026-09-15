@@ -162,9 +162,7 @@
 
           <div>
             <label class="text-xs text-gray-600 block mb-1">قیمت (تومان):</label>
-            <div class="relative">
-              <input type="text" id="new-price" oninput="formatPriceInput(this)" placeholder="مثلاً: 45,000" class="w-full p-2 border rounded-lg text-sm dir-ltr text-right">
-            </div>
+            <input type="number" id="new-price" placeholder="مثلاً: 45000" class="w-full p-2 border rounded-lg text-sm">
           </div>
 
           <button id="save-btn" onclick="saveProduct()" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-700 transition">
@@ -237,16 +235,6 @@
     let isTorchOn = false;
     let isProcessingScan = false;
     let audioCtx = null;
-
-    // تابع فرمت کاماگذاری قیمت موقع تایپ ورودی
-    function formatPriceInput(input) {
-      let value = input.value.replace(/,/g, '').replace(/[^\d]/g, '');
-      if (value) {
-        input.value = Number(value).toLocaleString();
-      } else {
-        input.value = '';
-      }
-    }
 
     // توابع پخش صدای بیپ بدون نیاز به فایل خارجی
     function initAudio() {
@@ -429,7 +417,7 @@
         playSuccessBeep();
         currentProduct = { barcode: decodedText, ...product };
         document.getElementById('product-name').innerText = product.name;
-        document.getElementById('product-price').innerText = Number(product.price).toLocaleString();
+        document.getElementById('product-price').innerText = product.price.toLocaleString();
         document.getElementById('quantity').value = 1;
         document.getElementById('product-info').classList.remove('hidden');
       } else {
@@ -474,8 +462,7 @@
     async function saveProduct() {
       const barcode = document.getElementById('new-barcode').value.trim();
       const name = document.getElementById('new-name').value.trim();
-      const rawPrice = document.getElementById('new-price').value.replace(/,/g, '');
-      const price = parseInt(rawPrice);
+      const price = parseInt(document.getElementById('new-price').value);
 
       if (!barcode || !name || isNaN(price)) {
         alert("لطفاً تمامی فیلدها را به درستی وارد کنید.");
@@ -504,7 +491,7 @@
 
     function prepareBatchPrint(barcode) {
       selectedPrintItem = { barcode: barcode, ...database[barcode] };
-      document.getElementById('selected-print-title').innerText = `کالا: ${selectedPrintItem.name} (${Number(selectedPrintItem.price).toLocaleString()} تومان)`;
+      document.getElementById('selected-print-title').innerText = `کالا: ${selectedPrintItem.name} (${selectedPrintItem.price.toLocaleString()} تومان)`;
       document.getElementById('batch-print-box').classList.remove('hidden');
     }
 
@@ -526,7 +513,7 @@
           <div class="label-card">
             <div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">${selectedPrintItem.name}</div>
             <svg id="${svgId}"></svg>
-            <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${Number(selectedPrintItem.price).toLocaleString()} تومان</div>
+            <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${selectedPrintItem.price.toLocaleString()} تومان</div>
           </div>
         `;
         printContainer.innerHTML += cardHtml;
@@ -601,15 +588,15 @@
           <li class="py-2 flex justify-between items-center">
             <div>
               <span class="font-medium text-gray-800">${item.name}</span>
-              <span class="text-xs text-gray-400 block">${item.quantity} عدد × ${Number(item.price).toLocaleString()}</span>
+              <span class="text-xs text-gray-400 block">${item.quantity} عدد × ${item.price.toLocaleString()}</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="font-semibold">${Number(item.total).toLocaleString()} تومان</span>
+              <span class="font-semibold">${item.total.toLocaleString()} تومان</span>
               <button onclick="removeFromCart(${index})" class="text-red-500 font-bold px-1 text-xs">✕</button>
             </div>
           </li>`;
       });
-      totalPriceEl.innerText = Number(sum).toLocaleString();
+      totalPriceEl.innerText = sum.toLocaleString();
     }
 
     function removeFromCart(index) {
@@ -648,7 +635,7 @@
           <div class="flex justify-between items-center p-2 bg-white rounded border text-xs">
             <div>
               <p class="font-bold text-gray-800">${item.name}</p>
-              <p class="text-gray-400 dir-ltr text-right">${barcode} - ${Number(item.price).toLocaleString()} تومان</p>
+              <p class="text-gray-400 dir-ltr text-right">${barcode} - ${item.price.toLocaleString()} تومان</p>
             </div>
             <div class="flex gap-1">
               <button onclick="prepareBatchPrint('${barcode}')" class="text-blue-600 bg-blue-50 px-2 py-1 rounded font-bold">🖨️ چاپ A4</button>
@@ -678,10 +665,10 @@
       let text = "🛒 <b>فاکتور جدید خرید</b>\n\n";
       let totalSum = 0;
       cart.forEach((item, i) => {
-        text += `${i + 1}. <b>${item.name}</b>\n   تعداد: ${item.quantity} | قیمت: ${Number(item.total).toLocaleString()} تومان\n`;
+        text += `${i + 1}. <b>${item.name}</b>\n   تعداد: ${item.quantity} | قیمت: ${item.total.toLocaleString()} تومان\n`;
         totalSum += item.total;
       });
-      text += `\n💰 <b>جمع کل: ${Number(totalSum).toLocaleString()} تومان</b>`;
+      text += `\n💰 <b>جمع کل: ${totalSum.toLocaleString()} تومان</b>`;
 
       try {
         const response = await fetch(WORKER_URL, {
