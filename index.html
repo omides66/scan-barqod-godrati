@@ -21,6 +21,7 @@
       border-radius: 0.75rem;
     }
     
+    /* استایل چاپ برگه A4 */
     @media print {
       body * {
         visibility: hidden;
@@ -34,13 +35,13 @@
         top: 0;
         width: 100%;
         display: grid !important;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 8px;
-        padding: 10px;
+        grid-template-columns: repeat(4, 1fr); /* ۴ ستون برچسب در برگه A4 */
+        gap: 6px;
+        padding: 8px;
       }
       .label-card {
         border: 1px dashed #bbb;
-        padding: 6px;
+        padding: 4px;
         text-align: center;
         page-break-inside: avoid;
         border-radius: 6px;
@@ -110,7 +111,7 @@
 
     <!-- ==================== بخش مدیریت اجناس ==================== -->
     <div id="tab-manage" class="hidden">
-      <!-- ثبت تکی کالا / تولید بارکد جدید -->
+      <!-- ثبت تکی کالا -->
       <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4">
         <h3 class="font-bold text-gray-800 mb-3 text-sm">ثبت کالا (با بارکد یا تولید خودکار)</h3>
         <div class="space-y-3">
@@ -140,33 +141,27 @@
         </div>
       </div>
 
-      <!-- تنظیمات چاپ چندتایی لیبل روی A4 -->
-      <div id="batch-print-box" class="bg-blue-50 p-4 rounded-xl border border-blue-200 mb-4 hidden">
-        <h3 class="font-bold text-blue-900 text-sm mb-2">🖨️ تنظیمات چاپ چندتایی روی برگه A4</h3>
-        <p id="selected-print-title" class="text-xs text-blue-700 mb-2"></p>
-        
-        <div class="flex items-center gap-2 mb-3">
-          <label class="text-xs text-gray-700 font-bold">تعداد برچسب روی A4:</label>
-          <input type="number" id="print-count" value="24" min="1" max="60" class="w-16 p-1 border rounded text-center text-sm font-bold">
-        </div>
-
-        <div class="flex gap-2">
-          <button onclick="executeBatchPrint()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-blue-700">
-            چاپ برگه A4
-          </button>
-          <button onclick="cancelPrint()" class="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs">
-            انصراف
-          </button>
-        </div>
-      </div>
-
-      <!-- لیست کالاهای ذخیره‌شده -->
-      <div>
+      <!-- پنل مدیریت چاپ گروهی برچسب‌ها -->
+      <div class="border-t pt-4">
         <div class="flex justify-between items-center mb-2">
           <h3 class="font-bold text-gray-700 text-sm">لیست اجناس (<span id="products-count">0</span> کالا):</h3>
           <button onclick="exportCSV()" class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300">دانلود خروجی اکسل</button>
         </div>
-        <div id="products-list" class="space-y-2 max-h-60 overflow-y-auto"></div>
+
+        <!-- ابزارهای انتخاب گروهی چاپ -->
+        <div class="flex justify-between items-center bg-blue-50 p-2.5 rounded-xl border border-blue-100 mb-3">
+          <label class="flex items-center gap-1.5 text-xs font-bold text-blue-900 cursor-pointer">
+            <input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this.checked)" class="w-4 h-4 rounded text-blue-600">
+            <span>انتخاب همه</span>
+          </label>
+
+          <button onclick="executeMultiPrint()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow flex items-center gap-1">
+            🖨️ چاپ موارد انتخابی
+          </button>
+        </div>
+
+        <!-- لیست اجناس به همراه چک‌باکس و تعداد چاپ -->
+        <div id="products-list" class="space-y-2 max-h-72 overflow-y-auto"></div>
       </div>
     </div>
 
@@ -189,7 +184,7 @@
     </div>
   </div>
 
-  <!-- منطقه مخصوص چاپ برگه A4 -->
+  <!-- منطقه مخصوص ساخت و چاپ برگه A4 -->
   <div id="print-page-a4" class="hidden"></div>
 
   <script>
@@ -198,7 +193,6 @@
 
     let database = JSON.parse(localStorage.getItem('grocery_db')) || {};
     let currentProduct = null;
-    let selectedPrintItem = null;
     let tempBarcode = "";
     let cart = [];
     let html5QrCode = null;
@@ -238,10 +232,10 @@
     }
 
     function onScanSuccess(decodedText) {
-      if (isProcessingScan) return; // اگر در حال پردازش اسکن قبلی است، اسکن جدید انجام نشود
+      if (isProcessingScan) return;
 
       isProcessingScan = true;
-      try { html5QrCode.pause(); } catch(e){} // متوقف کردن اسکنر
+      try { html5QrCode.pause(); } catch(e){}
 
       const product = database[decodedText];
 
@@ -306,50 +300,69 @@
       document.getElementById('new-name').value = '';
       document.getElementById('new-price').value = '';
       renderProductsList();
-      
-      // بازگشت به تب اسکن و فعال‌سازی مجدد دوربین
       switchTab('scan');
     }
 
-    function prepareBatchPrint(barcode) {
-      selectedPrintItem = { barcode: barcode, ...database[barcode] };
-      document.getElementById('selected-print-title').innerText = `کالا: ${selectedPrintItem.name} (${selectedPrintItem.price.toLocaleString()} تومان)`;
-      document.getElementById('batch-print-box').classList.remove('hidden');
+    /* === توابع چاپ گروهی هوشمند === */
+    function toggleSelectAll(isChecked) {
+      const cbs = document.querySelectorAll('.item-cb');
+      cbs.forEach(cb => cb.checked = isChecked);
     }
 
-    function cancelPrint() {
-      selectedPrintItem = null;
-      document.getElementById('batch-print-box').classList.add('hidden');
-    }
+    function executeMultiPrint() {
+      const checkboxes = document.querySelectorAll('.item-cb:checked');
+      if (checkboxes.length === 0) {
+        alert("لطفاً حداقل یک کالا را برای چاپ انتخاب کنید.");
+        return;
+      }
 
-    function executeBatchPrint() {
-      if (!selectedPrintItem) return;
+      const printItems = [];
+      checkboxes.forEach(cb => {
+        const barcode = cb.value;
+        const countInput = document.getElementById(`print-count-${barcode}`);
+        const count = parseInt(countInput.value) || 1;
+        if (database[barcode]) {
+          printItems.push({
+            barcode: barcode,
+            name: database[barcode].name,
+            price: database[barcode].price,
+            count: count
+          });
+        }
+      });
 
-      const count = parseInt(document.getElementById('print-count').value) || 24;
       const printContainer = document.getElementById('print-page-a4');
       printContainer.innerHTML = '';
 
-      for (let i = 0; i < count; i++) {
-        const svgId = `print-svg-${i}`;
-        const cardHtml = `
-          <div class="label-card">
-            <div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">${selectedPrintItem.name}</div>
-            <svg id="${svgId}"></svg>
-            <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${selectedPrintItem.price.toLocaleString()} تومان</div>
-          </div>
-        `;
-        printContainer.innerHTML += cardHtml;
-      }
+      let globalSvgIndex = 0;
+      const svgTasks = [];
 
-      for (let i = 0; i < count; i++) {
-        JsBarcode(`#print-svg-${i}`, selectedPrintItem.barcode, {
+      printItems.forEach(item => {
+        for (let i = 0; i < item.count; i++) {
+          const svgId = `multi-print-svg-${globalSvgIndex}`;
+          const cardHtml = `
+            <div class="label-card">
+              <div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">${item.name}</div>
+              <svg id="${svgId}"></svg>
+              <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${item.price.toLocaleString()} تومان</div>
+            </div>
+          `;
+          printContainer.innerHTML += cardHtml;
+          svgTasks.push({ id: svgId, barcode: item.barcode });
+          globalSvgIndex++;
+        }
+      });
+
+      // رندر کامل تمامی بارکدها
+      svgTasks.forEach(task => {
+        JsBarcode(`#${task.id}`, task.barcode, {
           format: "CODE128",
           width: 1.5,
           height: 35,
           displayValue: true,
           fontSize: 10
         });
-      }
+      });
 
       printContainer.classList.remove('hidden');
       window.print();
@@ -453,14 +466,21 @@
       keys.forEach((barcode) => {
         const item = database[barcode];
         listEl.innerHTML += `
-          <div class="flex justify-between items-center p-2 bg-white rounded border text-xs">
-            <div>
-              <p class="font-bold text-gray-800">${item.name}</p>
-              <p class="text-gray-400 dir-ltr text-right">${barcode} - ${item.price.toLocaleString()} تومان</p>
+          <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200 text-xs shadow-sm">
+            <div class="flex items-center gap-2">
+              <input type="checkbox" value="${barcode}" class="item-cb w-4 h-4 rounded text-blue-600 cursor-pointer">
+              <div>
+                <p class="font-bold text-gray-800">${item.name}</p>
+                <p class="text-gray-400 dir-ltr text-right">${barcode} - ${item.price.toLocaleString()} تومان</p>
+              </div>
             </div>
-            <div class="flex gap-1">
-              <button onclick="prepareBatchPrint('${barcode}')" class="text-blue-600 bg-blue-50 px-2 py-1 rounded font-bold">🖨️ چاپ A4</button>
-              <button onclick="deleteProduct('${barcode}')" class="text-red-500 bg-red-50 px-2 py-1 rounded">حذف</button>
+            
+            <div class="flex items-center gap-2">
+              <div class="flex items-center border rounded bg-gray-50 px-1">
+                <span class="text-[10px] text-gray-500 pl-1">تعداد چاپ:</span>
+                <input type="number" id="print-count-${barcode}" value="2" min="1" max="50" class="w-8 p-1 text-center font-bold bg-transparent outline-none">
+              </div>
+              <button onclick="deleteProduct('${barcode}')" class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition">🗑️</button>
             </div>
           </div>
         `;
