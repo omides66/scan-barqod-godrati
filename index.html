@@ -6,6 +6,7 @@
   <title>سیستم فروش و مدیریت بارکد</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
   <style>
     input[type=number]::-webkit-inner-spin-button, 
     input[type=number]::-webkit-outer-spin-button { 
@@ -15,10 +16,36 @@
     input[type=number] {
       -moz-appearance: textfield;
     }
-    /* استایل سفارشی برای منطقه اسکنر */
     #reader video {
       object-fit: cover !important;
       border-radius: 0.75rem;
+    }
+    
+    /* استایل‌های اختصاصی برای چاپ برگه A4 برچسب‌ها */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #print-page-a4, #print-page-a4 * {
+        visibility: visible;
+      }
+      #print-page-a4 {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr); /* ۴ ستون در برگه A4 */
+        gap: 8px;
+        padding: 10px;
+      }
+      .label-card {
+        border: 1px dashed #bbb;
+        padding: 6px;
+        text-align: center;
+        page-break-inside: avoid;
+        border-radius: 6px;
+      }
     }
   </style>
 </head>
@@ -33,7 +60,6 @@
 
     <!-- ==================== بخش فروش و اسکن ==================== -->
     <div id="tab-scan">
-      <!-- بخش اسکنر با طراحی بهینه‌شده -->
       <div class="relative mb-4">
         <div id="reader" class="w-full rounded-xl border overflow-hidden bg-black min-h-[220px]"></div>
         <button id="torch-btn" onclick="toggleTorch()" class="hidden absolute top-3 left-3 bg-white/80 backdrop-blur-md text-gray-800 p-2 rounded-lg text-xs font-bold shadow z-10 flex items-center gap-1">
@@ -42,26 +68,20 @@
       </div>
 
       <!-- اطلاعات محصول اسکن شده -->
-      <div id="product-info" class="hidden bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4 animate-fade-in">
+      <div id="product-info" class="hidden bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4">
         <h2 id="product-name" class="font-bold text-gray-800 text-lg mb-1"></h2>
         <p class="text-sm text-gray-600 mb-3">قیمت واحد: <span id="product-price" class="font-semibold text-blue-600"></span> تومان</p>
         
-        <!-- کنترل تعداد -->
         <div class="flex items-center justify-between gap-2 mb-3">
           <span class="text-sm font-medium text-gray-700">تعداد / مقدار:</span>
-          
           <div class="flex items-center border border-gray-300 rounded-xl bg-white overflow-hidden shadow-sm">
-            <button onclick="changeQty(-1)" class="w-12 h-11 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xl active:bg-gray-300 transition flex items-center justify-center">
-              −
-            </button>
+            <button onclick="changeQty(-1)" class="w-12 h-11 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xl active:bg-gray-300 transition flex items-center justify-center">−</button>
             <input type="number" id="quantity" value="1" min="1" readonly class="w-14 text-center font-bold text-lg text-blue-700 bg-transparent outline-none">
-            <button onclick="changeQty(1)" class="w-12 h-11 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xl active:bg-gray-300 transition flex items-center justify-center">
-              +
-            </button>
+            <button onclick="changeQty(1)" class="w-12 h-11 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xl active:bg-gray-300 transition flex items-center justify-center">+</button>
           </div>
         </div>
 
-        <button onclick="addToCart()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 active:scale-[0.99] transition shadow">
+        <button onclick="addToCart()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow">
           افزودن به فاکتور
         </button>
       </div>
@@ -86,37 +106,53 @@
 
     <!-- ==================== بخش مدیریت اجناس ==================== -->
     <div id="tab-manage" class="hidden">
-      <!-- ورود دسته‌جمعی از اکسل -->
-      <div class="bg-green-50 p-4 rounded-xl border border-green-200 mb-4">
-        <h3 class="font-bold text-green-800 mb-2 text-sm">📁 ورود دسته‌جمعی اجناس از فایل اکسل (CSV)</h3>
-        <p class="text-xs text-green-700 mb-3">فرمت ستون‌ها: ستون ۱ = بارکد | ستون ۲ = نام کالا | ستون ۳ = قیمت</p>
-        <input type="file" id="csv-file" accept=".csv" class="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-700 mb-2">
-        <button onclick="importCSV()" class="w-full bg-green-700 text-white py-2 rounded-lg text-xs font-bold">بارگذاری اجناس از فایل</button>
-      </div>
-
-      <!-- ثبت تکی کالا -->
+      <!-- ثبت تکی کالا / تولید بارکد جدید -->
       <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4">
-        <h3 class="font-bold text-gray-800 mb-3 text-sm">ثبت / ویرایش تکی کالا</h3>
+        <h3 class="font-bold text-gray-800 mb-3 text-sm">ثبت کالا (با بارکد یا تولید خودکار)</h3>
         <div class="space-y-3">
           <div>
             <label class="text-xs text-gray-600 block mb-1">کد بارکد:</label>
             <div class="flex gap-2">
-              <input type="text" id="new-barcode" placeholder="بارکد را وارد یا اسکن کنید" class="flex-1 p-2 border rounded-lg text-sm dir-ltr">
-              <button onclick="fillBarcodeFromScanner()" class="bg-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-xs font-bold">آخرین اسکن</button>
+              <input type="text" id="new-barcode" placeholder="بارکد یا کد تولیدی" class="flex-1 p-2 border rounded-lg text-sm dir-ltr">
+              <button onclick="generateRandomBarcode()" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-xs font-bold transition">
+                ⚡ تولید کد
+              </button>
             </div>
           </div>
 
           <div>
             <label class="text-xs text-gray-600 block mb-1">نام کالا:</label>
-            <input type="text" id="new-name" placeholder="مثلاً: روغن ۱ لیتری" class="w-full p-2 border rounded-lg text-sm">
+            <input type="text" id="new-name" placeholder="مثلاً: حبوبات (بسته ۱ کیلویی)" class="w-full p-2 border rounded-lg text-sm">
           </div>
 
           <div>
             <label class="text-xs text-gray-600 block mb-1">قیمت (تومان):</label>
-            <input type="number" id="new-price" placeholder="مثلاً: 85000" class="w-full p-2 border rounded-lg text-sm">
+            <input type="number" id="new-price" placeholder="مثلاً: 45000" class="w-full p-2 border rounded-lg text-sm">
           </div>
 
-          <button onclick="saveProduct()" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold text-sm">ذخیره کالا</button>
+          <button onclick="saveProduct()" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-700 transition">
+            ذخیره کالا در سیستم
+          </button>
+        </div>
+      </div>
+
+      <!-- تنظیمات چاپ چندتایی لیبل روی A4 -->
+      <div id="batch-print-box" class="bg-blue-50 p-4 rounded-xl border border-blue-200 mb-4 hidden">
+        <h3 class="font-bold text-blue-900 text-sm mb-2">🖨️ تنظیمات چاپ چندتایی روی برگه A4</h3>
+        <p id="selected-print-title" class="text-xs text-blue-700 mb-2"></p>
+        
+        <div class="flex items-center gap-2 mb-3">
+          <label class="text-xs text-gray-700 font-bold">تعداد برچسب روی A4:</label>
+          <input type="number" id="print-count" value="24" min="1" max="60" class="w-16 p-1 border rounded text-center text-sm font-bold">
+        </div>
+
+        <div class="flex gap-2">
+          <button onclick="executeBatchPrint()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-blue-700">
+            چاپ برگه A4
+          </button>
+          <button onclick="cancelPrint()" class="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs">
+            انصراف
+          </button>
         </div>
       </div>
 
@@ -126,11 +162,14 @@
           <h3 class="font-bold text-gray-700 text-sm">لیست اجناس (<span id="products-count">0</span> کالا):</h3>
           <button onclick="exportCSV()" class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300">دانلود خروجی اکسل</button>
         </div>
-        <div id="products-list" class="space-y-2 max-h-52 overflow-y-auto"></div>
+        <div id="products-list" class="space-y-2 max-h-60 overflow-y-auto"></div>
       </div>
     </div>
 
   </div>
+
+  <!-- منطقه مخصوص ساخت و چاپ برگه A4 -->
+  <div id="print-page-a4" class="hidden"></div>
 
   <script>
     const BOT_TOKEN = "__BOT_TOKEN__";
@@ -139,18 +178,16 @@
     let database = JSON.parse(localStorage.getItem('grocery_db')) || {};
     let lastScannedBarcode = "";
     let currentProduct = null;
+    let selectedPrintItem = null;
     let cart = [];
     let html5QrCode = null;
     let isTorchOn = false;
 
-    // تنظیمات فوق‌العاده سریع اسکنر
     const scanConfig = {
-      fps: 30, // افزایش تعداد فریم‌ها برای اسکن آنی
-      qrbox: { width: 260, height: 160 }, // کادر مستطیلی متناسب با بارکد‌های خطی
+      fps: 30,
+      qrbox: { width: 260, height: 160 },
       aspectRatio: 1.0,
-      experimentalFeatures: {
-        useBarCodeDetectorIfSupported: true // استفاده از پردازنده سخت‌افزاری گوشی در صورت پشتیبانی
-      },
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
       formatsToSupport: [
         Html5QrcodeSupportedFormats.EAN_13,
         Html5QrcodeSupportedFormats.EAN_8,
@@ -164,31 +201,22 @@
     function startScanner() {
       html5QrCode = new Html5Qrcode("reader");
       html5QrCode.start(
-        { facingMode: "environment" }, // اجبار به استفاده از دوربین اصلی پشت
+        { facingMode: "environment" },
         scanConfig,
         onScanSuccess
       ).then(() => {
-        // بررسی پشتیبانی گوشی از چراغ‌قوه
         const capabilities = html5QrCode.getRunningTrackCapabilities();
-        if (capabilities.torch) {
-          document.getElementById('torch-btn').classList.remove('hidden');
-        }
-      }).catch(err => {
-        console.error("خطا در باز کردن دوربین:", err);
-      });
+        if (capabilities.torch) document.getElementById('torch-btn').classList.remove('hidden');
+      }).catch(err => console.error("خطا در دوربین:", err));
     }
 
     function toggleTorch() {
       isTorchOn = !isTorchOn;
-      html5QrCode.applyVideoConstraints({
-        advanced: [{ torch: isTorchOn }]
-      });
+      html5QrCode.applyVideoConstraints({ advanced: [{ torch: isTorchOn }] });
     }
 
     function onScanSuccess(decodedText) {
-      if (lastScannedBarcode === decodedText && !document.getElementById('product-info').classList.contains('hidden')) {
-        return; // جلوگیری از اسکن مکرر یک کالا در چند میلی‌ثانیه
-      }
+      if (lastScannedBarcode === decodedText && !document.getElementById('product-info').classList.contains('hidden')) return;
 
       lastScannedBarcode = decodedText;
       const product = database[decodedText];
@@ -200,9 +228,85 @@
         document.getElementById('quantity').value = 1;
         document.getElementById('product-info').classList.remove('hidden');
       } else {
-        alert("بارکد اسکن شد: " + decodedText + "\nاین کالا هنوز ثبت نشده است.");
+        alert("بارکد اسکن شد: " + decodedText + "\nاین کالا ثبت نشده است.");
         document.getElementById('new-barcode').value = decodedText;
+        switchTab('manage');
       }
+    }
+
+    function generateRandomBarcode() {
+      let uniqueCode = "";
+      do {
+        uniqueCode = "90" + Math.floor(1000 + Math.random() * 9000);
+      } while (database[uniqueCode]);
+
+      document.getElementById('new-barcode').value = uniqueCode;
+    }
+
+    function saveProduct() {
+      const barcode = document.getElementById('new-barcode').value.trim();
+      const name = document.getElementById('new-name').value.trim();
+      const price = parseInt(document.getElementById('new-price').value);
+
+      if (!barcode || !name || isNaN(price)) {
+        alert("لطفاً تمامی فیلدها را به درستی وارد کنید.");
+        return;
+      }
+
+      database[barcode] = { name: name, price: price };
+      localStorage.setItem('grocery_db', JSON.stringify(database));
+      alert("کالا با موفقیت ذخیره شد!");
+      
+      document.getElementById('new-barcode').value = '';
+      document.getElementById('new-name').value = '';
+      document.getElementById('new-price').value = '';
+      renderProductsList();
+    }
+
+    function prepareBatchPrint(barcode) {
+      selectedPrintItem = { barcode: barcode, ...database[barcode] };
+      document.getElementById('selected-print-title').innerText = `کالا: ${selectedPrintItem.name} (${selectedPrintItem.price.toLocaleString()} تومان)`;
+      document.getElementById('batch-print-box').classList.remove('hidden');
+    }
+
+    function cancelPrint() {
+      selectedPrintItem = null;
+      document.getElementById('batch-print-box').classList.add('hidden');
+    }
+
+    function executeBatchPrint() {
+      if (!selectedPrintItem) return;
+
+      const count = parseInt(document.getElementById('print-count').value) || 24;
+      const printContainer = document.getElementById('print-page-a4');
+      printContainer.innerHTML = '';
+
+      for (let i = 0; i < count; i++) {
+        const svgId = `print-svg-${i}`;
+        const cardHtml = `
+          <div class="label-card">
+            <div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">${selectedPrintItem.name}</div>
+            <svg id="${svgId}"></svg>
+            <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${selectedPrintItem.price.toLocaleString()} تومان</div>
+          </div>
+        `;
+        printContainer.innerHTML += cardHtml;
+      }
+
+      // رندر تمامی بارکدها
+      for (let i = 0; i < count; i++) {
+        JsBarcode(`#print-svg-${i}`, selectedPrintItem.barcode, {
+          format: "CODE128",
+          width: 1.5,
+          height: 35,
+          displayValue: true,
+          fontSize: 10
+        });
+      }
+
+      printContainer.classList.remove('hidden');
+      window.print();
+      printContainer.classList.add('hidden');
     }
 
     function changeQty(amount) {
@@ -270,79 +374,18 @@
       updateCartUI();
     }
 
-    function saveProduct() {
-      const barcode = document.getElementById('new-barcode').value.trim();
-      const name = document.getElementById('new-name').value.trim();
-      const price = parseInt(document.getElementById('new-price').value);
-
-      if (!barcode || !name || isNaN(price)) {
-        alert("لطفاً تمامی فیلدها را به درستی وارد کنید.");
-        return;
-      }
-
-      database[barcode] = { name: name, price: price };
-      localStorage.setItem('grocery_db', JSON.stringify(database));
-      alert("کالا ذخیره شد!");
-      document.getElementById('new-barcode').value = '';
-      document.getElementById('new-name').value = '';
-      document.getElementById('new-price').value = '';
-      renderProductsList();
-    }
-
-    function importCSV() {
-      const fileInput = document.getElementById('csv-file');
-      const file = fileInput.files[0];
-
-      if (!file) {
-        alert("لطفاً ابتدا یک فایل CSV انتخاب کنید.");
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const text = e.target.result;
-        const lines = text.split('\n');
-        let count = 0;
-
-        lines.forEach(line => {
-          const parts = line.split(',');
-          if (parts.length >= 3) {
-            const barcode = parts[0].trim();
-            const name = parts[1].trim();
-            const price = parseInt(parts[2].trim());
-
-            if (barcode && name && !isNaN(price)) {
-              database[barcode] = { name: name, price: price };
-              count++;
-            }
-          }
-        });
-
-        localStorage.setItem('grocery_db', JSON.stringify(database));
-        alert(`${count} کالا با موفقیت وارد سیستم شد!`);
-        renderProductsList();
-      };
-      reader.readAsText(file, 'UTF-8');
-    }
-
     function exportCSV() {
       let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
       Object.keys(database).forEach(barcode => {
         const item = database[barcode];
         csvContent += `${barcode},${item.name},${item.price}\n`;
       });
-      const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
+      link.setAttribute("href", encodeURI(csvContent));
       link.setAttribute("download", "grocery_products.csv");
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    }
-
-    function fillBarcodeFromScanner() {
-      if (lastScannedBarcode) document.getElementById('new-barcode').value = lastScannedBarcode;
-      else alert("هنوز بارکدی اسکن نشده است.");
     }
 
     function renderProductsList() {
@@ -364,7 +407,10 @@
               <p class="font-bold text-gray-800">${item.name}</p>
               <p class="text-gray-400 dir-ltr text-right">${barcode} - ${item.price.toLocaleString()} تومان</p>
             </div>
-            <button onclick="deleteProduct('${barcode}')" class="text-red-500 font-bold px-2 py-1 hover:bg-red-50 rounded">حذف</button>
+            <div class="flex gap-1">
+              <button onclick="prepareBatchPrint('${barcode}')" class="text-blue-600 bg-blue-50 px-2 py-1 rounded font-bold">🖨️ چاپ A4</button>
+              <button onclick="deleteProduct('${barcode}')" class="text-red-500 bg-red-50 px-2 py-1 rounded">حذف</button>
+            </div>
           </div>
         `;
       });
@@ -402,7 +448,6 @@
       .catch(() => alert("ارتباط با تلگرام برقرار نشد."));
     }
 
-    // شروع بکار خودکار اسکنر به محض بارگذاری صفحه
     window.addEventListener('DOMContentLoaded', startScanner);
   </script>
 </body>
