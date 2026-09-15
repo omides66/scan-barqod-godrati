@@ -3,22 +3,43 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main  # یا master اگر شاخه اصلی شما master است
+      - main  # اگر نام شاخه اصلی شما master است، این را به master تغییر دهید
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Replace Secrets in HTML
+      - name: Inject Secrets into HTML
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
         run: |
-          sed -i 's/__BOT_TOKEN__/${{ secrets.BOT_TOKEN }}/g' index.html
-          sed -i 's/__CHAT_ID__/${{ secrets.CHAT_ID }}/g' index.html
+          sed -i "s/__BOT_TOKEN__/$BOT_TOKEN/g" index.html
+          sed -i "s/__CHAT_ID__/$CHAT_ID/g" index.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./
+        id: deployment
+        uses: actions/deploy-pages@v4
