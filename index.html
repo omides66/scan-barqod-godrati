@@ -21,7 +21,6 @@
       border-radius: 0.75rem;
     }
     
-    /* استایل‌های اختصاصی برای چاپ برگه A4 برچسب‌ها */
     @media print {
       body * {
         visibility: hidden;
@@ -35,7 +34,7 @@
         top: 0;
         width: 100%;
         display: grid !important;
-        grid-template-columns: repeat(4, 1fr); /* ۴ ستون در برگه A4 */
+        grid-template-columns: repeat(4, 1fr);
         gap: 8px;
         padding: 10px;
       }
@@ -81,9 +80,14 @@
           </div>
         </div>
 
-        <button onclick="addToCart()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow">
-          افزودن به فاکتور
-        </button>
+        <div class="flex gap-2">
+          <button onclick="addToCart()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow">
+            افزودن به فاکتور
+          </button>
+          <button onclick="cancelScan()" class="bg-gray-200 text-gray-700 px-4 py-3 rounded-xl font-bold hover:bg-gray-300 transition">
+            انصراف
+          </button>
+        </div>
       </div>
 
       <!-- سبد خرید -->
@@ -168,23 +172,41 @@
 
   </div>
 
-  <!-- منطقه مخصوص ساخت و چاپ برگه A4 -->
+  <!-- پاپ‌آپ مدال ثبت کالای ناشناخته -->
+  <div id="unknown-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl p-5 max-w-sm w-full text-center shadow-xl">
+      <div class="text-3xl mb-2">⚠️</div>
+      <h3 class="font-bold text-gray-800 text-lg mb-2">کالای ناشناخته</h3>
+      <p class="text-sm text-gray-600 mb-4">بارکد <span id="modal-barcode" class="font-bold font-mono text-blue-600"></span> در سیستم پیدا نشد. آیا می‌خواهید آن را ثبت کنید؟</p>
+      <div class="flex gap-2">
+        <button onclick="goToRegisterProduct()" class="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700">
+          ثبت کالا
+        </button>
+        <button onclick="closeUnknownModal()" class="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-xl font-bold text-sm hover:bg-gray-300">
+          بستن و اسکن مجدد
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- منطقه مخصوص چاپ برگه A4 -->
   <div id="print-page-a4" class="hidden"></div>
 
   <script>
-    // ⚠️ لینک آدرس Cloudflare Worker خود را در خط زیر جایگزین کنید:
-    const WORKER_URL = "https://godrati.ez-1332d6.workers.dev";
+    // ⚠️ آدرس Worker اختصاصی خود را وارد کنید
+    const WORKER_URL = "https://my-telegram-proxy.xxxx.workers.dev";
 
     let database = JSON.parse(localStorage.getItem('grocery_db')) || {};
-    let lastScannedBarcode = "";
     let currentProduct = null;
     let selectedPrintItem = null;
+    let tempBarcode = "";
     let cart = [];
     let html5QrCode = null;
     let isTorchOn = false;
+    let isProcessingScan = false;
 
     const scanConfig = {
-      fps: 30,
+      fps: 15,
       qrbox: { width: 260, height: 160 },
       aspectRatio: 1.0,
       experimentalFeatures: { useBarCodeDetectorIfSupported: true },
@@ -216,9 +238,11 @@
     }
 
     function onScanSuccess(decodedText) {
-      if (lastScannedBarcode === decodedText && !document.getElementById('product-info').classList.contains('hidden')) return;
+      if (isProcessingScan) return; // اگر در حال پردازش اسکن قبلی است، اسکن جدید انجام نشود
 
-      lastScannedBarcode = decodedText;
+      isProcessingScan = true;
+      try { html5QrCode.pause(); } catch(e){} // متوقف کردن اسکنر
+
       const product = database[decodedText];
 
       if (product) {
@@ -228,10 +252,32 @@
         document.getElementById('quantity').value = 1;
         document.getElementById('product-info').classList.remove('hidden');
       } else {
-        alert("بارکد اسکن شد: " + decodedText + "\nاین کالا ثبت نشده است.");
-        document.getElementById('new-barcode').value = decodedText;
-        switchTab('manage');
+        tempBarcode = decodedText;
+        document.getElementById('modal-barcode').innerText = decodedText;
+        document.getElementById('unknown-modal').classList.remove('hidden');
       }
+    }
+
+    function cancelScan() {
+      document.getElementById('product-info').classList.add('hidden');
+      currentProduct = null;
+      isProcessingScan = false;
+      try { html5QrCode.resume(); } catch(e){}
+    }
+
+    function closeUnknownModal() {
+      document.getElementById('unknown-modal').classList.add('hidden');
+      tempBarcode = "";
+      isProcessingScan = false;
+      try { html5QrCode.resume(); } catch(e){}
+    }
+
+    function goToRegisterProduct() {
+      document.getElementById('unknown-modal').classList.add('hidden');
+      document.getElementById('new-barcode').value = tempBarcode;
+      switchTab('manage');
+      tempBarcode = "";
+      isProcessingScan = false;
     }
 
     function generateRandomBarcode() {
@@ -255,12 +301,14 @@
 
       database[barcode] = { name: name, price: price };
       localStorage.setItem('grocery_db', JSON.stringify(database));
-      alert("کالا با موفقیت ذخیره شد!");
       
       document.getElementById('new-barcode').value = '';
       document.getElementById('new-name').value = '';
       document.getElementById('new-price').value = '';
       renderProductsList();
+      
+      // بازگشت به تب اسکن و فعال‌سازی مجدد دوربین
+      switchTab('scan');
     }
 
     function prepareBatchPrint(barcode) {
@@ -293,7 +341,6 @@
         printContainer.innerHTML += cardHtml;
       }
 
-      // رندر تمامی بارکدها
       for (let i = 0; i < count; i++) {
         JsBarcode(`#print-svg-${i}`, selectedPrintItem.barcode, {
           format: "CODE128",
@@ -323,6 +370,8 @@
         document.getElementById('tab-manage').classList.add('hidden');
         document.getElementById('tab-scan-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600";
         document.getElementById('tab-manage-btn').className = "flex-1 py-2 font-bold text-gray-500";
+        isProcessingScan = false;
+        try { html5QrCode.resume(); } catch(e){}
       } else {
         document.getElementById('tab-scan').classList.add('hidden');
         document.getElementById('tab-manage').classList.remove('hidden');
@@ -340,6 +389,8 @@
       document.getElementById('product-info').classList.add('hidden');
       document.getElementById('quantity').value = 1;
       currentProduct = null;
+      isProcessingScan = false;
+      try { html5QrCode.resume(); } catch(e){}
     }
 
     function updateCartUI() {
@@ -449,14 +500,14 @@
         const data = await response.json();
 
         if (response.ok && data.ok) {
-          alert("فاکتور به تلگرام ارسال شد!");
+          alert("فاکتور با موفقیت به تلگرام ارسال شد!");
           cart = [];
           updateCartUI();
         } else {
-          alert("خطا در ارسال به تلگرام. لطفا تنظیمات Worker را بررسی کنید.");
+          alert("خطا در ارسال به تلگرام. تنظیمات Worker را بررسی کنید.");
         }
       } catch (err) {
-        alert("ارتباط با تلگرام برقرار نشد.");
+        alert("ارتباط با Worker تلگرام برقرار نشد.");
         console.error("Error sending message:", err);
       } finally {
         sendBtn.disabled = false;
