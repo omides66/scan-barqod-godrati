@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>سیستم فروش و مدیریت بارکد</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- کتابخانه اسکن بارکد با دوربین -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-3 md:p-6 font-sans">
+  <div class="max-w-md mx-auto bg-white rounded-2xl shadow-md overflow-hidden p-5">
+    
+    <!-- تب‌های بالای صفحه -->
+    <div class="flex border-b mb-4">
+      <button id="tab-scan-btn" onclick="switchTab('scan')" class="flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600">فروش و اسکن</button>
+      <button id="tab-manage-btn" onclick="switchTab('manage')" class="flex-1 py-2 font-bold text-gray-500">مدیریت اجناس</button>
+    </div>
+
+    <!-- ==================== بخش فروش و اسکن ==================== -->
+    <div id="tab-scan">
+      <!-- اسکنر دوربین -->
+      <div id="reader" class="w-full rounded-lg border overflow-hidden mb-4"></div>
+
+      <!-- اطلاعات محصول اسکن شده -->
+      <div id="product-info" class="hidden bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4">
+        <h2 id="product-name" class="font-bold text-gray-800 text-lg mb-1"></h2>
+        <p class="text-sm text-gray-600 mb-3">قیمت واحد: <span id="product-price" class="font-semibold text-blue-600"></span> تومان</p>
+        
+        <div class="flex items-center gap-3">
+          <label for="quantity" class="text-sm text-gray-700">تعداد / مقدار:</label>
+          <input type="number" id="quantity" value="1" min="1" class="w-20 p-2 border rounded-lg text-center font-bold">
+          <button onclick="addToCart()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition">افزودن به فاکتور</button>
+        </div>
+      </div>
+
+      <!-- سبد خرید -->
+      <div class="border-t pt-4">
+        <h3 class="font-bold text-gray-700 mb-2">اقلام فاکتور:</h3>
+        <ul id="cart-list" class="divide-y divide-gray-100 text-sm text-gray-600 mb-4 min-h-[50px]">
+          <li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>
+        </ul>
+
+        <!-- مجموع قیمت -->
+        <div class="flex justify-between items-center font-bold text-lg text-gray-800 border-t pt-3 mb-4">
+          <span>جمع کل:</span>
+          <div><span id="total-price">0</span> <span class="text-sm font-normal">تومان</span></div>
+        </div>
+
+        <button onclick="sendToTelegram()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition">
+          ارسال فاکتور به تلگرام
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== بخش تعریف و مدیریت اجناس ==================== -->
+    <div id="tab-manage" class="hidden">
+      <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4">
+        <h3 class="font-bold text-gray-800 mb-3">ثبت / ویرایش محصول جدید</h3>
+        
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs text-gray-600 block mb-1">کد بارکد:</label>
+            <div class="flex gap-2">
+              <input type="text" id="new-barcode" placeholder="بارکد را وارد یا اسکن کنید" class="flex-1 p-2 border rounded-lg text-sm dir-ltr">
+              <button onclick="fillBarcodeFromScanner()" class="bg-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-xs font-bold">آخرین اسکن</button>
+            </div>
+          </div>
+
+          <div>
+            <label class="text-xs text-gray-600 block mb-1">نام کالا:</label>
+            <input type="text" id="new-name" placeholder="مثلاً: روغن ۱ لیتری" class="w-full p-2 border rounded-lg text-sm">
+          </div>
+
+          <div>
+            <label class="text-xs text-gray-600 block mb-1">قیمت (تومان):</label>
+            <input type="number" id="new-price" placeholder="مثلاً: 85000" class="w-full p-2 border rounded-lg text-sm">
+          </div>
+
+          <button onclick="saveProduct()" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 transition">
+            ذخیره کالا در حافظه
+          </button>
+        </div>
+      </div>
+
+      <!-- لیست کالاهای ذخیره‌شده -->
+      <div>
+        <h3 class="font-bold text-gray-700 mb-2">لیست اجناس ثبت‌شده (<span id="products-count">0</span> کالا):</h3>
+        <div id="products-list" class="space-y-2 max-h-60 overflow-y-auto">
+          <!-- کالاهایی که ثبت شده‌اند اینجا نمایش داده می‌شوند -->
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // **تنظیمات ربات تلگرام خود را اینجا وارد کنید**
+    const BOT_TOKEN = "8324101625:AAHWDvWDXB8nKMlyfX4Xt6XhojSsNbDyXcE";
+    const CHAT_ID = "284289003";
+
+    // دریافت لیست اجناس از حافظه گوشی یا ایجاد یک شیء خالی
+    let database = JSON.parse(localStorage.getItem('grocery_db')) || {};
+    let lastScannedBarcode = "";
+    let currentProduct = null;
+    let cart = [];
+
+    // ساخت اسکنر بارکد
+    const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 220 });
+    html5QrcodeScanner.render(onScanSuccess);
+
+    function onScanSuccess(decodedText) {
+      lastScannedBarcode = decodedText;
+      const product = database[decodedText];
+
+      if (product) {
+        currentProduct = { barcode: decodedText, ...product };
+        document.getElementById('product-name').innerText = product.name;
+        document.getElementById('product-price').innerText = product.price.toLocaleString();
+        document.getElementById('product-info').classList.remove('hidden');
+      } else {
+        alert("بارکد اسکن شد: " + decodedText + "\nاین کالا هنوز تعریف نشده است. از تب 'مدیریت اجناس' آن را ثبت کنید.");
+        document.getElementById('new-barcode').value = decodedText;
+      }
+    }
+
+    // تعویض تب‌ها
+    function switchTab(tab) {
+      if (tab === 'scan') {
+        document.getElementById('tab-scan').classList.remove('hidden');
+        document.getElementById('tab-manage').classList.add('hidden');
+        document.getElementById('tab-scan-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600";
+        document.getElementById('tab-manage-btn').className = "flex-1 py-2 font-bold text-gray-500";
+      } else {
+        document.getElementById('tab-scan').classList.add('hidden');
+        document.getElementById('tab-manage').classList.remove('hidden');
+        document.getElementById('tab-manage-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600";
+        document.getElementById('tab-scan-btn').className = "flex-1 py-2 font-bold text-gray-500";
+        renderProductsList();
+      }
+    }
+
+    // افزودن کالا به سبد خرید
+    function addToCart() {
+      if (!currentProduct) return;
+      const qty = parseInt(document.getElementById('quantity').value) || 1;
+      
+      cart.push({
+        name: currentProduct.name,
+        price: currentProduct.price,
+        quantity: qty,
+        total: currentProduct.price * qty
+      });
+
+      updateCartUI();
+      document.getElementById('product-info').classList.add('hidden');
+      document.getElementById('quantity').value = 1;
+      currentProduct = null;
+    }
+
+    // بروزرسانی ظاهر سبد خرید
+    function updateCartUI() {
+      const cartList = document.getElementById('cart-list');
+      const totalPriceEl = document.getElementById('total-price');
+      
+      if (cart.length === 0) {
+        cartList.innerHTML = '<li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>';
+        totalPriceEl.innerText = "0";
+        return;
+      }
+
+      cartList.innerHTML = '';
+      let sum = 0;
+
+      cart.forEach((item) => {
+        sum += item.total;
+        cartList.innerHTML += `
+          <li class="py-2 flex justify-between items-center">
+            <div>
+              <span class="font-medium text-gray-800">${item.name}</span>
+              <span class="text-xs text-gray-400 block">${item.quantity} عدد × ${item.price.toLocaleString()}</span>
+            </div>
+            <span class="font-semibold">${item.total.toLocaleString()} تومان</span>
+          </li>
+        `;
+      });
+
+      totalPriceEl.innerText = sum.toLocaleString();
+    }
+
+    // ذخیره کالا در حافظه گوشی (localStorage)
+    function saveProduct() {
+      const barcode = document.getElementById('new-barcode').value.trim();
+      const name = document.getElementById('new-name').value.trim();
+      const price = parseInt(document.getElementById('new-price').value);
+
+      if (!barcode || !name || isNaN(price)) {
+        alert("لطفاً همه فیلدها (بارکد، نام و قیمت) را به درستی وارد کنید.");
+        return;
+      }
+
+      database[barcode] = { name: name, price: price };
+      localStorage.setItem('grocery_db', JSON.stringify(database));
+
+      alert("کالای «" + name + "» با موفقیت ذخیره شد!");
+      
+      // پاکسازی ورودی‌ها
+      document.getElementById('new-barcode').value = '';
+      document.getElementById('new-name').value = '';
+      document.getElementById('new-price').value = '';
+
+      renderProductsList();
+    }
+
+    // پر کردن کادر بارکد با آخرین اسکن
+    function fillBarcodeFromScanner() {
+      if (lastScannedBarcode) {
+        document.getElementById('new-barcode').value = lastScannedBarcode;
+      } else {
+        alert("هنوز بارکدی اسکن نشده است.");
+      }
+    }
+
+    // رندر و نمایش لیست اجناس ثبت‌شده
+    function renderProductsList() {
+      const listEl = document.getElementById('products-list');
+      const keys = Object.keys(database);
+      document.getElementById('products-count').innerText = keys.length;
+
+      if (keys.length === 0) {
+        listEl.innerHTML = '<p class="text-center text-xs text-gray-400 py-2">هیچ کالایی ثبت نشده است.</p>';
+        return;
+      }
+
+      listEl.innerHTML = '';
+      keys.forEach((barcode) => {
+        const item = database[barcode];
+        listEl.innerHTML += `
+          <div class="flex justify-between items-center p-2 bg-white rounded border text-xs">
+            <div>
+              <p class="font-bold text-gray-800">${item.name}</p>
+              <p class="text-gray-400 dir-ltr text-right">${barcode} - ${item.price.toLocaleString()} تومان</p>
+            </div>
+            <button onclick="deleteProduct('${barcode}')" class="text-red-500 font-bold px-2 py-1 hover:bg-red-50 rounded">حذف</button>
+          </div>
+        `;
+      });
+    }
+
+    // حذف کالا از حافظه
+    function deleteProduct(barcode) {
+      if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
+        delete database[barcode];
+        localStorage.setItem('grocery_db', JSON.stringify(database));
+        renderProductsList();
+      }
+    }
+
+    // ارسال فاکتور به تلگرام
+    function sendToTelegram() {
+      if (cart.length === 0) {
+        alert("سبد خرید خالی است!");
+        return;
+      }
+
+      if (BOT_TOKEN === "BOT_TOKEN_HERE" || CHAT_ID === "CHAT_ID_HERE") {
+        alert("لطفاً ابتدا توکن ربات و چت آیدی تلگرام را در کد برنامه تنظیم کنید.");
+        return;
+      }
+
+      let text = "🛒 *فاکتور جدید خرید*\n\n";
+      let totalSum = 0;
+
+      cart.forEach((item, i) => {
+        text += `${i + 1}. ${item.name}\n   تعداد: ${item.quantity} | قیمت: ${item.total.toLocaleString()} تومان\n`;
+        totalSum += item.total;
+      });
+
+      text += `\n💰 *جمع کل: ${totalSum.toLocaleString()} تومان*`;
+
+      fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: CHAT_ID,
+          text: text,
+          parse_mode: "Markdown"
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          alert("فاکتور با موفقیت به تلگرام ارسال شد!");
+          cart = [];
+          updateCartUI();
+        } else {
+          alert("خطا در ارسال پیام به تلگرام.");
+        }
+      })
+      .catch(() => alert("ارتباط با تلگرام برقرار نشد."));
+    }
+  </script>
+</body>
+</html>
