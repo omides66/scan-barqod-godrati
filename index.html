@@ -86,7 +86,6 @@
     <div class="flex border-b mb-4">
       <button id="tab-scan-btn" onclick="switchTab('scan')" class="flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600">فروش و اسکن</button>
       <button id="tab-manage-btn" onclick="switchTab('manage')" class="flex-1 py-2 font-bold text-gray-500">مدیریت اجناس</button>
-      <button id="tab-print-btn" onclick="switchTab('print')" class="flex-1 py-2 font-bold text-gray-500">چاپ بارکدها</button>
     </div>
 
     <!-- ==================== بخش فروش و اسکن ==================== -->
@@ -202,12 +201,6 @@
         </div>
         <div id="products-list" class="space-y-2 max-h-60 overflow-y-auto"></div>
       </div>
-    </div>
-
-    <!-- ==================== بخش چاپ بارکدها ==================== -->
-    <div id="tab-print" class="hidden">
-      <h3 class="font-bold text-gray-700 text-sm mb-3">بارکدهای تولیدی برنامه:</h3>
-      <div id="generated-barcodes-list" class="space-y-3 max-h-80 overflow-y-auto"></div>
     </div>
 
   </div>
@@ -517,4 +510,209 @@
 
     function cancelPrint() {
       selectedPrintItem = null;
-      document.getEleme
+      document.getElementById('batch-print-box').classList.add('hidden');
+    }
+
+    function executeBatchPrint() {
+      if (!selectedPrintItem) return;
+
+      const count = parseInt(document.getElementById('print-count').value) || 24;
+      const printContainer = document.getElementById('print-page-a4');
+      printContainer.innerHTML = '';
+
+      for (let i = 0; i < count; i++) {
+        const svgId = `print-svg-${i}`;
+        const cardHtml = `
+          <div class="label-card">
+            <div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">${selectedPrintItem.name}</div>
+            <svg id="${svgId}"></svg>
+            <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${Number(selectedPrintItem.price).toLocaleString()} تومان</div>
+          </div>
+        `;
+        printContainer.innerHTML += cardHtml;
+      }
+
+      for (let i = 0; i < count; i++) {
+        JsBarcode(`#print-svg-${i}`, selectedPrintItem.barcode, {
+          format: "CODE128",
+          width: 1.5,
+          height: 35,
+          displayValue: true,
+          fontSize: 10
+        });
+      }
+
+      printContainer.classList.remove('hidden');
+      window.print();
+      printContainer.classList.add('hidden');
+    }
+
+    function changeQty(amount) {
+      const qtyInput = document.getElementById('quantity');
+      let currentVal = parseInt(qtyInput.value) || 1;
+      currentVal += amount;
+      if (currentVal < 1) currentVal = 1;
+      qtyInput.value = currentVal;
+    }
+
+    function switchTab(tab) {
+      initAudio();
+      if (tab === 'scan') {
+        document.getElementById('tab-scan').classList.remove('hidden');
+        document.getElementById('tab-manage').classList.add('hidden');
+        document.getElementById('tab-scan-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600";
+        document.getElementById('tab-manage-btn').className = "flex-1 py-2 font-bold text-gray-500";
+        isProcessingScan = false;
+        try { html5QrCode.resume(); } catch(e){}
+      } else {
+        document.getElementById('tab-scan').classList.add('hidden');
+        document.getElementById('tab-manage').classList.remove('hidden');
+        document.getElementById('tab-manage-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600";
+        document.getElementById('tab-scan-btn').className = "flex-1 py-2 font-bold text-gray-500";
+        renderProductsList();
+      }
+    }
+
+    function addToCart() {
+      if (!currentProduct) return;
+      const qty = parseInt(document.getElementById('quantity').value) || 1;
+      cart.push({ name: currentProduct.name, price: currentProduct.price, quantity: qty, total: currentProduct.price * qty });
+      updateCartUI();
+      document.getElementById('product-info').classList.add('hidden');
+      document.getElementById('quantity').value = 1;
+      currentProduct = null;
+      isProcessingScan = false;
+      try { html5QrCode.resume(); } catch(e){}
+    }
+
+    function updateCartUI() {
+      const cartList = document.getElementById('cart-list');
+      const totalPriceEl = document.getElementById('total-price');
+      if (cart.length === 0) {
+        cartList.innerHTML = '<li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>';
+        totalPriceEl.innerText = "0";
+        return;
+      }
+      cartList.innerHTML = '';
+      let sum = 0;
+      cart.forEach((item, index) => {
+        sum += item.total;
+        cartList.innerHTML += `
+          <li class="py-2 flex justify-between items-center">
+            <div>
+              <span class="font-medium text-gray-800">${item.name}</span>
+              <span class="text-xs text-gray-400 block">${item.quantity} عدد × ${Number(item.price).toLocaleString()}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="font-semibold">${Number(item.total).toLocaleString()} تومان</span>
+              <button onclick="removeFromCart(${index})" class="text-red-500 font-bold px-1 text-xs">✕</button>
+            </div>
+          </li>`;
+      });
+      totalPriceEl.innerText = Number(sum).toLocaleString();
+    }
+
+    function removeFromCart(index) {
+      cart.splice(index, 1);
+      updateCartUI();
+    }
+
+    function exportCSV() {
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+      Object.keys(database).forEach(barcode => {
+        const item = database[barcode];
+        csvContent += `${barcode},${item.name},${item.price}\n`;
+      });
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI(csvContent));
+      link.setAttribute("download", "grocery_products.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function renderProductsList() {
+      const listEl = document.getElementById('products-list');
+      const keys = Object.keys(database);
+      document.getElementById('products-count').innerText = keys.length;
+
+      if (keys.length === 0) {
+        listEl.innerHTML = '<p class="text-center text-xs text-gray-400 py-2">هیچ کالایی ثبت نشده است.</p>';
+        return;
+      }
+
+      listEl.innerHTML = '';
+      keys.forEach((barcode) => {
+        const item = database[barcode];
+        listEl.innerHTML += `
+          <div class="flex justify-between items-center p-2 bg-white rounded border text-xs">
+            <div>
+              <p class="font-bold text-gray-800">${item.name}</p>
+              <p class="text-gray-400 dir-ltr text-right">${barcode} - ${Number(item.price).toLocaleString()} تومان</p>
+            </div>
+            <div class="flex gap-1">
+              <button onclick="prepareBatchPrint('${barcode}')" class="text-blue-600 bg-blue-50 px-2 py-1 rounded font-bold">🖨️ چاپ A4</button>
+              <button onclick="deleteProduct('${barcode}')" class="text-red-500 bg-red-50 px-2 py-1 rounded">حذف</button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    async function deleteProduct(barcode) {
+      if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
+        delete database[barcode];
+        localStorage.setItem('grocery_db', JSON.stringify(database));
+        renderProductsList();
+        await saveDatabaseToCloudflare();
+      }
+    }
+
+    async function sendToTelegram() {
+      if (cart.length === 0) { alert("سبد خرید خالی است!"); return; }
+
+      const sendBtn = document.getElementById('send-btn');
+      sendBtn.disabled = true;
+      sendBtn.innerText = "در حال ارسال...";
+
+      let text = "🛒 <b>فاکتور جدید خرید</b>\n\n";
+      let totalSum = 0;
+      cart.forEach((item, i) => {
+        text += `${i + 1}. <b>${item.name}</b>\n   تعداد: ${item.quantity} | قیمت: ${Number(item.total).toLocaleString()} تومان\n`;
+        totalSum += item.total;
+      });
+      text += `\n💰 <b>جمع کل: ${Number(totalSum).toLocaleString()} تومان</b>`;
+
+      try {
+        const response = await fetch(WORKER_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            action: "send_invoice",
+            password: sessionStorage.getItem('app_pass'),
+            message: text 
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.ok) {
+          alert("فاکتور با موفقیت به تلگرام ارسال شد!");
+          cart = [];
+          updateCartUI();
+        } else {
+          alert("خطا در ارسال به تلگرام.");
+        }
+      } catch (err) {
+        alert("ارتباط با Worker تلگرام برقرار نشد.");
+        console.error("Error sending message:", err);
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.innerText = "ارسال فاکتور به تلگرام";
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', checkAuthOnLoad);
+  </script>
+</body>
+</html>
