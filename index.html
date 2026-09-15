@@ -6,8 +6,19 @@
   <title>سیستم فروش و مدیریت بارکد</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    /* حذف فلش‌های پیش‌فرض مرورگر روی ورودی عددی */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; 
+      margin: 0; 
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-3 md:p-6 font-sans">
+<body class="bg-gray-100 min-h-screen p-3 md:p-6 font-sans select-none">
   <div class="max-w-md mx-auto bg-white rounded-2xl shadow-md overflow-hidden p-5">
     
     <!-- تب‌های بالای صفحه -->
@@ -20,17 +31,32 @@
     <div id="tab-scan">
       <div id="reader" class="w-full rounded-lg border overflow-hidden mb-4"></div>
 
+      <!-- اطلاعات محصول اسکن شده -->
       <div id="product-info" class="hidden bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4">
         <h2 id="product-name" class="font-bold text-gray-800 text-lg mb-1"></h2>
         <p class="text-sm text-gray-600 mb-3">قیمت واحد: <span id="product-price" class="font-semibold text-blue-600"></span> تومان</p>
         
-        <div class="flex items-center gap-3">
-          <label for="quantity" class="text-sm text-gray-700">تعداد / مقدار:</label>
-          <input type="number" id="quantity" value="1" min="1" class="w-20 p-2 border rounded-lg text-center font-bold">
-          <button onclick="addToCart()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition">افزودن به فاکتور</button>
+        <!-- کنترل تعداد با دکمه‌های بزرگ + و - -->
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <span class="text-sm font-medium text-gray-700">تعداد / مقدار:</span>
+          
+          <div class="flex items-center border border-gray-300 rounded-xl bg-white overflow-hidden shadow-sm">
+            <button onclick="changeQty(-1)" class="w-12 h-11 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xl active:bg-gray-300 transition flex items-center justify-center">
+              −
+            </button>
+            <input type="number" id="quantity" value="1" min="1" readonly class="w-14 text-center font-bold text-lg text-blue-700 bg-transparent outline-none">
+            <button onclick="changeQty(1)" class="w-12 h-11 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xl active:bg-gray-300 transition flex items-center justify-center">
+              +
+            </button>
+          </div>
         </div>
+
+        <button onclick="addToCart()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 active:scale-[0.99] transition shadow">
+          افزودن به فاکتور
+        </button>
       </div>
 
+      <!-- سبد خرید -->
       <div class="border-t pt-4">
         <h3 class="font-bold text-gray-700 mb-2">اقلام فاکتور:</h3>
         <ul id="cart-list" class="divide-y divide-gray-100 text-sm text-gray-600 mb-4 min-h-[50px]">
@@ -42,7 +68,7 @@
           <div><span id="total-price">0</span> <span class="text-sm font-normal">تومان</span></div>
         </div>
 
-        <button onclick="sendToTelegram()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition">
+        <button onclick="sendToTelegram()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition shadow">
           ارسال فاکتور به تلگرام
         </button>
       </div>
@@ -50,11 +76,10 @@
 
     <!-- ==================== بخش مدیریت اجناس ==================== -->
     <div id="tab-manage" class="hidden">
-      
       <!-- ورود دسته‌جمعی از اکسل -->
       <div class="bg-green-50 p-4 rounded-xl border border-green-200 mb-4">
         <h3 class="font-bold text-green-800 mb-2 text-sm">📁 ورود دسته‌جمعی اجناس از فایل اکسل (CSV)</h3>
-        <p class="text-xs text-green-700 mb-3">فرمت ستون‌ها در اکسل: ستون ۱ = بارکد | ستون ۲ = نام کالا | ستون ۳ = قیمت</p>
+        <p class="text-xs text-green-700 mb-3">فرمت ستون‌ها: ستون ۱ = بارکد | ستون ۲ = نام کالا | ستون ۳ = قیمت</p>
         <input type="file" id="csv-file" accept=".csv" class="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-700 mb-2">
         <button onclick="importCSV()" class="w-full bg-green-700 text-white py-2 rounded-lg text-xs font-bold">بارگذاری اجناس از فایل</button>
       </div>
@@ -98,9 +123,9 @@
   </div>
 
   <script>
-// مقادیر جایگزین که توسط گیت‌هاب پر خواهند شد
     const BOT_TOKEN = "__BOT_TOKEN__";
     const CHAT_ID = "__CHAT_ID__";
+
     let database = JSON.parse(localStorage.getItem('grocery_db')) || {};
     let lastScannedBarcode = "";
     let currentProduct = null;
@@ -117,11 +142,21 @@
         currentProduct = { barcode: decodedText, ...product };
         document.getElementById('product-name').innerText = product.name;
         document.getElementById('product-price').innerText = product.price.toLocaleString();
+        document.getElementById('quantity').value = 1; // ریست تعداد به ۱
         document.getElementById('product-info').classList.remove('hidden');
       } else {
         alert("بارکد اسکن شد: " + decodedText + "\nاین کالا هنوز ثبت نشده است.");
         document.getElementById('new-barcode').value = decodedText;
       }
+    }
+
+    // تغییر تعداد با دکمه‌های + و -
+    function changeQty(amount) {
+      const qtyInput = document.getElementById('quantity');
+      let currentVal = parseInt(qtyInput.value) || 1;
+      currentVal += amount;
+      if (currentVal < 1) currentVal = 1;
+      qtyInput.value = currentVal;
     }
 
     function switchTab(tab) {
@@ -159,11 +194,26 @@
       }
       cartList.innerHTML = '';
       let sum = 0;
-      cart.forEach((item) => {
+      cart.forEach((item, index) => {
         sum += item.total;
-        cartList.innerHTML += `<li class="py-2 flex justify-between items-center"><div><span class="font-medium text-gray-800">${item.name}</span><span class="text-xs text-gray-400 block">${item.quantity} عدد × ${item.price.toLocaleString()}</span></div><span class="font-semibold">${item.total.toLocaleString()} تومان</span></li>`;
+        cartList.innerHTML += `
+          <li class="py-2 flex justify-between items-center">
+            <div>
+              <span class="font-medium text-gray-800">${item.name}</span>
+              <span class="text-xs text-gray-400 block">${item.quantity} عدد × ${item.price.toLocaleString()}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="font-semibold">${item.total.toLocaleString()} تومان</span>
+              <button onclick="removeFromCart(${index})" class="text-red-500 font-bold px-1 text-xs">✕</button>
+            </div>
+          </li>`;
       });
       totalPriceEl.innerText = sum.toLocaleString();
+    }
+
+    function removeFromCart(index) {
+      cart.splice(index, 1);
+      updateCartUI();
     }
 
     function saveProduct() {
@@ -185,7 +235,6 @@
       renderProductsList();
     }
 
-    // آپلود دسته‌جمعی از فایل CSV اکسل
     function importCSV() {
       const fileInput = document.getElementById('csv-file');
       const file = fileInput.files[0];
@@ -222,7 +271,6 @@
       reader.readAsText(file, 'UTF-8');
     }
 
-    // دانلود بک‌آپ به صورت فایل اکسل CSV
     function exportCSV() {
       let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
       Object.keys(database).forEach(barcode => {
@@ -278,7 +326,6 @@
 
     function sendToTelegram() {
       if (cart.length === 0) { alert("سبد خرید خالی است!"); return; }
-      if (BOT_TOKEN === "BOT_TOKEN_HERE" || CHAT_ID === "CHAT_ID_HERE") { alert("لطفاً توکن ربات و چت آیدی را تنظیم کنید."); return; }
 
       let text = "🛒 *فاکتور جدید خرید*\n\n";
       let totalSum = 0;
@@ -288,7 +335,7 @@
       });
       text += `\n💰 *جمع کل: ${totalSum.toLocaleString()} تومان*`;
 
-      fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      fetch(`https://telegram-bot-api.vercel.app/bot${BOT_TOKEN}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chat_id: CHAT_ID, text: text, parse_mode: "Markdown" })
