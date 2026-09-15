@@ -84,9 +84,9 @@
 
     <!-- تب‌های بالای صفحه -->
     <div class="flex border-b mb-4">
-      <button id="tab-scan-btn" onclick="switchTab('scan')" class="flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm">فروش و اسکن</button>
-      <button id="tab-manage-btn" onclick="switchTab('manage')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">مدیریت اجناس</button>
-      <button id="tab-print-btn" onclick="switchTab('print')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">چاپ بارکدها</button>
+      <button id="tab-scan-btn" onclick="switchTab('scan')" class="flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600">فروش و اسکن</button>
+      <button id="tab-manage-btn" onclick="switchTab('manage')" class="flex-1 py-2 font-bold text-gray-500">مدیریت اجناس</button>
+      <button id="tab-print-btn" onclick="switchTab('print')" class="flex-1 py-2 font-bold text-gray-500">چاپ بارکدها</button>
     </div>
 
     <!-- ==================== بخش فروش و اسکن ==================== -->
@@ -206,29 +206,7 @@
 
     <!-- ==================== بخش چاپ بارکدها ==================== -->
     <div id="tab-print" class="hidden">
-      <!-- تنظیمات چاپ روی A4 مخصوص این تب -->
-      <div id="print-tab-box" class="bg-blue-50 p-4 rounded-xl border border-blue-200 mb-4 hidden">
-        <h3 class="font-bold text-blue-900 text-sm mb-2">🖨️ تنظیمات چاپ چندتایی روی برگه A4</h3>
-        <p id="print-tab-title" class="text-xs text-blue-700 mb-2 font-bold"></p>
-        
-        <div class="flex items-center gap-2 mb-3">
-          <label class="text-xs text-gray-700 font-bold">تعداد برچسب روی A4:</label>
-          <input type="number" id="print-tab-count" value="24" min="1" max="60" class="w-16 p-1 border rounded text-center text-sm font-bold">
-        </div>
-
-        <div class="flex gap-2">
-          <button onclick="executeBatchPrintFromTab()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg text-xs font-bold hover:bg-blue-700">
-            چاپ برگه A4
-          </button>
-          <button onclick="cancelPrintTab()" class="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs">
-            انصراف
-          </button>
-        </div>
-      </div>
-
-      <div class="flex justify-between items-center mb-3">
-        <h3 class="font-bold text-gray-700 text-sm">بارکدهای تولیدی برنامه:</h3>
-      </div>
+      <h3 class="font-bold text-gray-700 text-sm mb-3">بارکدهای تولیدی برنامه:</h3>
       <div id="generated-barcodes-list" class="space-y-3 max-h-80 overflow-y-auto"></div>
     </div>
 
@@ -260,7 +238,6 @@
     let database = JSON.parse(localStorage.getItem('grocery_db')) || {};
     let currentProduct = null;
     let selectedPrintItem = null;
-    let selectedPrintTabItem = null;
     let tempBarcode = "";
     let cart = [];
     let html5QrCode = null;
@@ -540,106 +517,4 @@
 
     function cancelPrint() {
       selectedPrintItem = null;
-      document.getElementById('batch-print-box').classList.add('hidden');
-    }
-
-    function executeBatchPrint() {
-      if (!selectedPrintItem) return;
-
-      const count = parseInt(document.getElementById('print-count').value) || 24;
-      const printContainer = document.getElementById('print-page-a4');
-      printContainer.innerHTML = '';
-
-      for (let i = 0; i < count; i++) {
-        const svgId = `print-svg-${i}`;
-        const cardHtml = `
-          <div class="label-card">
-            <div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">${selectedPrintItem.name}</div>
-            <svg id="${svgId}"></svg>
-            <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${Number(selectedPrintItem.price).toLocaleString()} تومان</div>
-          </div>
-        `;
-        printContainer.innerHTML += cardHtml;
-      }
-
-      for (let i = 0; i < count; i++) {
-        JsBarcode(`#print-svg-${i}`, selectedPrintItem.barcode, {
-          format: "CODE128",
-          width: 1.5,
-          height: 35,
-          displayValue: true,
-          fontSize: 10
-        });
-      }
-
-      printContainer.classList.remove('hidden');
-      window.print();
-      printContainer.classList.add('hidden');
-    }
-
-    // رندر بارکدهای تولیدی برنامه در تب سوم
-    function renderGeneratedBarcodesList() {
-      const listEl = document.getElementById('generated-barcodes-list');
-      const keys = Object.keys(database).filter(b => b.startsWith('90'));
-
-      if (keys.length === 0) {
-        listEl.innerHTML = '<p class="text-center text-xs text-gray-400 py-4">هنوز هیچ بارکد تولیدی ثبت نشده است.</p>';
-        return;
-      }
-
-      listEl.innerHTML = '';
-      keys.forEach((barcode) => {
-        const item = database[barcode];
-        const svgId = `print-tab-svg-${barcode}`;
-        listEl.innerHTML += `
-          <div class="p-3 bg-white rounded-xl border border-gray-200 text-center shadow-sm">
-            <div class="flex justify-between items-center text-xs mb-1">
-              <span class="font-bold text-gray-800">${item.name}</span>
-              <span class="text-blue-600 font-semibold">${Number(item.price).toLocaleString()} تومان</span>
-            </div>
-            <div class="flex justify-center py-1 overflow-hidden">
-              <svg id="${svgId}"></svg>
-            </div>
-            <button onclick="prepareBatchPrintTab('${barcode}')" class="w-full mt-2 bg-blue-50 hover:bg-blue-100 text-blue-600 py-1.5 rounded-lg text-xs font-bold transition">
-              🖨️ چاپ برگه A4
-            </button>
-          </div>
-        `;
-      });
-
-      keys.forEach((barcode) => {
-        try {
-          JsBarcode(`#print-tab-svg-${barcode}`, barcode, {
-            format: "CODE128",
-            width: 1.5,
-            height: 35,
-            displayValue: true,
-            fontSize: 10
-          });
-        } catch(e){}
-      });
-    }
-
-    function prepareBatchPrintTab(barcode) {
-      selectedPrintTabItem = { barcode: barcode, ...database[barcode] };
-      document.getElementById('print-tab-title').innerText = `کالا: ${selectedPrintTabItem.name} (${Number(selectedPrintTabItem.price).toLocaleString()} تومان)`;
-      document.getElementById('print-tab-box').classList.remove('hidden');
-    }
-
-    function cancelPrintTab() {
-      selectedPrintTabItem = null;
-      document.getElementById('print-tab-box').classList.add('hidden');
-    }
-
-    function executeBatchPrintFromTab() {
-      if (!selectedPrintTabItem) return;
-
-      const count = parseInt(document.getElementById('print-tab-count').value) || 24;
-      const printContainer = document.getElementById('print-page-a4');
-      printContainer.innerHTML = '';
-
-      for (let i = 0; i < count; i++) {
-        const svgId = `print-svg-${i}`;
-        const cardHtml = `
-          <div class="label-card">
-            <div style="font-size: 11px; font-weight: bold; margin-bottom:
+      document.getEleme
