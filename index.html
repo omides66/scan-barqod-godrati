@@ -21,7 +21,7 @@
       border-radius: 0.75rem;
     }
     
-    /* استایل چاپ برگه A4 */
+    /* استایل استاندارد چاپ برگه A4 (دقیقا ۲۴ بارکد در هر صفحه) */
     @media print {
       body * {
         visibility: hidden;
@@ -34,17 +34,42 @@
         left: 0;
         top: 0;
         width: 100%;
+        display: block !important;
+      }
+      @page {
+        size: A4 portrait;
+        margin: 8mm;
+      }
+      .a4-page {
+        width: 100%;
+        height: 275mm;
         display: grid !important;
-        grid-template-columns: repeat(4, 1fr); /* ۴ ستون برچسب در برگه A4 */
-        gap: 6px;
-        padding: 8px;
+        grid-template-columns: repeat(3, 1fr); /* ۳ ستون */
+        grid-template-rows: repeat(8, 1fr);    /* ۸ سطر = جمعا ۲۴ خانه */
+        gap: 4mm;
+        box-sizing: border-box;
+        page-break-after: always; /* انتقال خودکار به صفحه بعدی بعد از ۲۴ بارکد */
+        break-after: page;
+      }
+      .a4-page:last-child {
+        page-break-after: auto;
+        break-after: auto;
       }
       .label-card {
         border: 1px dashed #bbb;
         padding: 4px;
         text-align: center;
-        page-break-inside: avoid;
         border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        box-sizing: border-box;
+      }
+      .label-card svg {
+        max-width: 95%;
+        max-height: 60%;
       }
     }
   </style>
@@ -132,7 +157,7 @@
 
           <div>
             <label class="text-xs text-gray-600 block mb-1">قیمت (تومان):</label>
-            <input type="number" id="new-price" placeholder="مثلاً: 45000" class="w-full p-2 border rounded-lg text-sm">
+            <input type="text" id="new-price" oninput="formatPriceInput(this)" placeholder="مثلاً: ۴۵,۰۰۰" class="w-full p-2 border rounded-lg text-sm dir-ltr text-right">
           </div>
 
           <button onclick="saveProduct()" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-700 transition">
@@ -144,7 +169,7 @@
       <!-- پنل مدیریت چاپ گروهی برچسب‌ها -->
       <div class="border-t pt-4">
         <div class="flex justify-between items-center mb-2">
-          <h3 class="font-bold text-gray-700 text-sm">لیست اجناس (<span id="products-count">0</span> کالا):</h3>
+          <h3 class="font-bold text-gray-700 text-sm">کالاهای تولیدی سیستم (<span id="products-count">0</span> کالا):</h3>
           <button onclick="exportCSV()" class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300">دانلود خروجی اکسل</button>
         </div>
 
@@ -160,7 +185,7 @@
           </button>
         </div>
 
-        <!-- لیست اجناس به همراه چک‌باکس و تعداد چاپ -->
+        <!-- لیست اجناس بارکد تولیدی سیستم به همراه + و - -->
         <div id="products-list" class="space-y-2 max-h-72 overflow-y-auto"></div>
       </div>
     </div>
@@ -188,7 +213,6 @@
   <div id="print-page-a4" class="hidden"></div>
 
   <script>
-    // ⚠️ آدرس Worker اختصاصی خود را وارد کنید
     const WORKER_URL = "https://godrati.ez-1332d6.workers.dev";
 
     let database = JSON.parse(localStorage.getItem('grocery_db')) || {};
@@ -198,6 +222,27 @@
     let html5QrCode = null;
     let isTorchOn = false;
     let isProcessingScan = false;
+
+    // تبدیل ارقام فارسی به انگلیسی
+    function toEnglishDigits(str) {
+      return str.replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+    }
+
+    // جداکننده سه رقمی هنگام تایپ قیمت
+    function formatPriceInput(input) {
+      let value = toEnglishDigits(input.value).replace(/\D/g, '');
+      if (value) {
+        input.value = Number(value).toLocaleString('en-US');
+      } else {
+        input.value = '';
+      }
+    }
+
+    // گرفتن قیمت عددی خالص از اینپوت
+    function getCleanPrice(inputValue) {
+      const cleanValue = toEnglishDigits(inputValue).replace(/,/g, '').trim();
+      return parseInt(cleanValue, 10);
+    }
 
     const scanConfig = {
       fps: 15,
@@ -286,7 +331,7 @@
     function saveProduct() {
       const barcode = document.getElementById('new-barcode').value.trim();
       const name = document.getElementById('new-name').value.trim();
-      const price = parseInt(document.getElementById('new-price').value);
+      const price = getCleanPrice(document.getElementById('new-price').value);
 
       if (!barcode || !name || isNaN(price)) {
         alert("لطفاً تمامی فیلدها را به درستی وارد کنید.");
@@ -303,10 +348,19 @@
       switchTab('scan');
     }
 
-    /* === توابع چاپ گروهی هوشمند === */
+    /* === توابع چاپ گروهی هوشمند (حداکثر ۲۴ عدد در هر صفحه) === */
     function toggleSelectAll(isChecked) {
       const cbs = document.querySelectorAll('.item-cb');
       cbs.forEach(cb => cb.checked = isChecked);
+    }
+
+    // کم و زیاد کردن تعداد چاپ با دکمه‌های + و -
+    function changePrintCount(barcode, delta) {
+      const input = document.getElementById(`print-count-${barcode}`);
+      let val = parseInt(input.value) || 1;
+      val += delta;
+      if (val < 1) val = 1;
+      input.value = val;
     }
 
     function executeMultiPrint() {
@@ -316,49 +370,56 @@
         return;
       }
 
-      const printItems = [];
+      // جمع‌آوری تمام بارکدها به‌صورت یک لیست تکرارشده
+      const allBarcodesToPrint = [];
       checkboxes.forEach(cb => {
         const barcode = cb.value;
         const countInput = document.getElementById(`print-count-${barcode}`);
         const count = parseInt(countInput.value) || 1;
         if (database[barcode]) {
-          printItems.push({
-            barcode: barcode,
-            name: database[barcode].name,
-            price: database[barcode].price,
-            count: count
-          });
+          for (let i = 0; i < count; i++) {
+            allBarcodesToPrint.push({
+              barcode: barcode,
+              name: database[barcode].name,
+              price: database[barcode].price
+            });
+          }
         }
       });
 
       const printContainer = document.getElementById('print-page-a4');
       printContainer.innerHTML = '';
 
-      let globalSvgIndex = 0;
+      const ITEMS_PER_PAGE = 24; // هر صفحه دقیقا ۲۴ بارکد
+      let currentPage = null;
       const svgTasks = [];
 
-      printItems.forEach(item => {
-        for (let i = 0; i < item.count; i++) {
-          const svgId = `multi-print-svg-${globalSvgIndex}`;
-          const cardHtml = `
-            <div class="label-card">
-              <div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">${item.name}</div>
-              <svg id="${svgId}"></svg>
-              <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${item.price.toLocaleString()} تومان</div>
-            </div>
-          `;
-          printContainer.innerHTML += cardHtml;
-          svgTasks.push({ id: svgId, barcode: item.barcode });
-          globalSvgIndex++;
+      allBarcodesToPrint.forEach((item, index) => {
+        // ایجاد صفحه جدید A4 به ازای هر ۲۴ بارکد
+        if (index % ITEMS_PER_PAGE === 0) {
+          currentPage = document.createElement('div');
+          currentPage.className = 'a4-page';
+          printContainer.appendChild(currentPage);
         }
+
+        const svgId = `multi-print-svg-${index}`;
+        const card = document.createElement('div');
+        card.className = 'label-card';
+        card.innerHTML = `
+          <div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">${item.name}</div>
+          <svg id="${svgId}"></svg>
+          <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${item.price.toLocaleString()} تومان</div>
+        `;
+        currentPage.appendChild(card);
+        svgTasks.push({ id: svgId, barcode: item.barcode });
       });
 
-      // رندر کامل تمامی بارکدها
+      // رندر کامل تصاویر بارکدها
       svgTasks.forEach(task => {
         JsBarcode(`#${task.id}`, task.barcode, {
           format: "CODE128",
           width: 1.5,
-          height: 35,
+          height: 38,
           displayValue: true,
           fontSize: 10
         });
@@ -452,18 +513,20 @@
       document.body.removeChild(link);
     }
 
+    /* رندر لیست اجناس - فقط بارکدهای خود سیستم (کدهایی که با 90 شروع می‌شوند) */
     function renderProductsList() {
       const listEl = document.getElementById('products-list');
-      const keys = Object.keys(database);
-      document.getElementById('products-count').innerText = keys.length;
+      // فیلتر کالاها: فقط بارکدهایی که توسط سیستم تولید شده‌اند (شروع با 90)
+      const systemBarcodes = Object.keys(database).filter(b => b.startsWith('90'));
+      document.getElementById('products-count').innerText = systemBarcodes.length;
 
-      if (keys.length === 0) {
-        listEl.innerHTML = '<p class="text-center text-xs text-gray-400 py-2">هیچ کالایی ثبت نشده است.</p>';
+      if (systemBarcodes.length === 0) {
+        listEl.innerHTML = '<p class="text-center text-xs text-gray-400 py-3">هیچ کالا با بارکد تولیدی سیستم یافت نشد.</p>';
         return;
       }
 
       listEl.innerHTML = '';
-      keys.forEach((barcode) => {
+      systemBarcodes.forEach((barcode) => {
         const item = database[barcode];
         listEl.innerHTML += `
           <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200 text-xs shadow-sm">
@@ -476,9 +539,11 @@
             </div>
             
             <div class="flex items-center gap-2">
-              <div class="flex items-center border rounded bg-gray-50 px-1">
-                <span class="text-[10px] text-gray-500 pl-1">تعداد چاپ:</span>
-                <input type="number" id="print-count-${barcode}" value="2" min="1" max="50" class="w-8 p-1 text-center font-bold bg-transparent outline-none">
+              <!-- دکمه‌های کم و زیاد کردن تعداد چاپ (+ و -) -->
+              <div class="flex items-center border border-gray-300 rounded-lg bg-gray-50 overflow-hidden">
+                <button onclick="changePrintCount('${barcode}', -1)" class="w-6 h-6 bg-gray-200 hover:bg-gray-300 font-bold text-gray-700 flex items-center justify-center">-</button>
+                <input type="number" id="print-count-${barcode}" value="1" min="1" readonly class="w-8 text-center font-bold bg-transparent outline-none text-xs">
+                <button onclick="changePrintCount('${barcode}', 1)" class="w-6 h-6 bg-gray-200 hover:bg-gray-300 font-bold text-gray-700 flex items-center justify-center">+</button>
               </div>
               <button onclick="deleteProduct('${barcode}')" class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition">🗑️</button>
             </div>
