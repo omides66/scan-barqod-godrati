@@ -49,39 +49,8 @@
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-3 md:p-6 font-sans select-none">
-
-  <!-- ==================== صفحه ورود با رمز عبور ==================== -->
-  <div id="login-screen" class="fixed inset-0 bg-gray-900/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full text-center border border-gray-100">
-      <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
-        🔒
-      </div>
-      <h2 class="font-bold text-gray-800 text-xl mb-1">ورود به سیستم فروش</h2>
-      <p class="text-xs text-gray-500 mb-6">لطفا رمز عبور مدیریت را وارد کنید</p>
-      
-      <form onsubmit="handleLogin(event)" class="space-y-4">
-        <div>
-          <input type="password" id="app-password" placeholder="رمز عبور" class="w-full text-center tracking-widest text-lg py-3 px-4 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dir-ltr bg-gray-50 transition" required>
-        </div>
-        <p id="login-error" class="text-xs text-red-500 hidden font-bold">رمز عبور اشتباه است یا خطایی رخ داده!</p>
-        <button type="submit" id="login-btn" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-500/30">
-          ورود به برنامه
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ==================== محتوای اصلی برنامه ==================== -->
-  <div id="main-app" class="max-w-md mx-auto bg-white rounded-2xl shadow-md overflow-hidden p-5 hidden">
+  <div class="max-w-md mx-auto bg-white rounded-2xl shadow-md overflow-hidden p-5">
     
-    <!-- هدر و دکمه خروج -->
-    <div class="flex justify-between items-center mb-3 pb-2 border-b">
-      <span class="text-xs font-bold text-gray-400">سیستم مدیریت و اسکن بارکد</span>
-      <button onclick="handleLogout()" class="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1 bg-red-50 px-2.5 py-1 rounded-lg transition">
-        🚪 خروج
-      </button>
-    </div>
-
     <!-- تب‌های بالای صفحه -->
     <div class="flex border-b mb-4">
       <button id="tab-scan-btn" onclick="switchTab('scan')" class="flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600">فروش و اسکن</button>
@@ -224,7 +193,7 @@
   <div id="print-page-a4" class="hidden"></div>
 
   <script>
-    // آدرس Worker کلادفلر
+    // ⚠️ آدرس Worker اختصاصی خود را وارد کنید
     const WORKER_URL = "https://godrati.ez-1332d6.workers.dev";
 
     let database = JSON.parse(localStorage.getItem('grocery_db')) || {};
@@ -236,62 +205,6 @@
     let isTorchOn = false;
     let isProcessingScan = false;
 
-    // --- بررسی رمز عبور با ارسال درخواست به کلادفلر Worker ---
-    async function handleLogin(event) {
-      event.preventDefault();
-      const inputPass = document.getElementById('app-password').value;
-      const errorEl = document.getElementById('login-error');
-      const loginBtn = document.getElementById('login-btn');
-
-      loginBtn.disabled = true;
-      loginBtn.innerText = "در حال بررسی...";
-      errorEl.classList.add('hidden');
-
-      try {
-        const response = await fetch(WORKER_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "login", password: inputPass })
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-          sessionStorage.setItem('is_logged_in', 'true');
-          sessionStorage.setItem('app_pass', inputPass); // ذخیره موقت رمز جهت استفاده در ارسال فاکتور
-          document.getElementById('login-screen').classList.add('hidden');
-          document.getElementById('main-app').classList.remove('hidden');
-          startScanner();
-        } else {
-          errorEl.innerText = data.message || "رمز عبور اشتباه است!";
-          errorEl.classList.remove('hidden');
-          document.getElementById('app-password').value = '';
-        }
-      } catch (err) {
-        errorEl.innerText = "خطا در ارتباط با سرور کلادفلر!";
-        errorEl.classList.remove('hidden');
-        console.error("Login Error:", err);
-      } finally {
-        loginBtn.disabled = false;
-        loginBtn.innerText = "ورود به برنامه";
-      }
-    }
-
-    function handleLogout() {
-      sessionStorage.removeItem('is_logged_in');
-      sessionStorage.removeItem('app_pass');
-      location.reload();
-    }
-
-    function checkAuthOnLoad() {
-      if (sessionStorage.getItem('is_logged_in') === 'true') {
-        document.getElementById('login-screen').classList.add('hidden');
-        document.getElementById('main-app').classList.remove('hidden');
-        startScanner();
-      }
-    }
-
-    // --- تنظیمات اسکنر ---
     const scanConfig = {
       fps: 15,
       qrbox: { width: 260, height: 160 },
@@ -308,8 +221,6 @@
     };
 
     function startScanner() {
-      if (html5QrCode) return;
-
       html5QrCode = new Html5Qrcode("reader");
       html5QrCode.start(
         { facingMode: "environment" },
@@ -327,10 +238,10 @@
     }
 
     function onScanSuccess(decodedText) {
-      if (isProcessingScan) return;
+      if (isProcessingScan) return; // اگر در حال پردازش اسکن قبلی است، اسکن جدید انجام نشود
 
       isProcessingScan = true;
-      try { html5QrCode.pause(); } catch(e){}
+      try { html5QrCode.pause(); } catch(e){} // متوقف کردن اسکنر
 
       const product = database[decodedText];
 
@@ -396,6 +307,7 @@
       document.getElementById('new-price').value = '';
       renderProductsList();
       
+      // بازگشت به تب اسکن و فعال‌سازی مجدد دوربین
       switchTab('scan');
     }
 
@@ -582,11 +494,7 @@
         const response = await fetch(WORKER_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            action: "send_invoice",
-            password: sessionStorage.getItem('app_pass'),
-            message: text 
-          })
+          body: JSON.stringify({ message: text })
         });
 
         const data = await response.json();
@@ -596,7 +504,7 @@
           cart = [];
           updateCartUI();
         } else {
-          alert("خطا در ارسال به تلگرام. دسترسی رد شد.");
+          alert("خطا در ارسال به تلگرام. تنظیمات Worker را بررسی کنید.");
         }
       } catch (err) {
         alert("ارتباط با Worker تلگرام برقرار نشد.");
@@ -607,7 +515,7 @@
       }
     }
 
-    window.addEventListener('DOMContentLoaded', checkAuthOnLoad);
+    window.addEventListener('DOMContentLoaded', startScanner);
   </script>
 </body>
 </html>
