@@ -165,7 +165,7 @@
             <input type="number" id="new-price" placeholder="مثلاً: 45000" class="w-full p-2 border rounded-lg text-sm">
           </div>
 
-          <button onclick="saveProduct()" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-700 transition">
+          <button id="save-btn" onclick="saveProduct()" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-700 transition">
             ذخیره کالا در سیستم
           </button>
         </div>
@@ -234,10 +234,88 @@
     let html5QrCode = null;
     let isTorchOn = false;
     let isProcessingScan = false;
+    let audioCtx = null;
+
+    // توابع پخش صدای بیپ بدون نیاز به فایل خارجی
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playSuccessBeep() {
+      try {
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1750, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.12);
+      } catch(e){}
+    }
+
+    function playErrorBeep() {
+      try {
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(320, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+      } catch(e){}
+    }
+
+    // همگام‌سازی دیتابیس با کلادفلر KV
+    async function syncDatabaseWithCloudflare() {
+      const pass = sessionStorage.getItem('app_pass');
+      try {
+        const res = await fetch(`${WORKER_URL}/products`, {
+          headers: { "Authorization": `Bearer ${pass}` }
+        });
+        if (res.ok) {
+          const cloudData = await res.json();
+          if (cloudData && typeof cloudData === 'object' && Object.keys(cloudData).length > 0) {
+            database = cloudData;
+            localStorage.setItem('grocery_db', JSON.stringify(database));
+            renderProductsList();
+          }
+        }
+      } catch (err) {
+        console.error("خطا در دریافت اجناس از کلادفلر:", err);
+      }
+    }
+
+    async function saveDatabaseToCloudflare() {
+      const pass = sessionStorage.getItem('app_pass');
+      try {
+        await fetch(`${WORKER_URL}/products`, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${pass}` 
+          },
+          body: JSON.stringify({ action: "save_products", password: pass, products: database })
+        });
+      } catch (err) {
+        console.error("خطا در ذخیره دیتابیس روی کلادفلر:", err);
+      }
+    }
 
     // بررسی رمز عبور با ارسال به کلادفلر
     async function handleLogin(event) {
       event.preventDefault();
+      initAudio();
       const inputPass = document.getElementById('app-password').value;
       const errorEl = document.getElementById('login-error');
       const loginBtn = document.getElementById('login-btn');
@@ -260,6 +338,7 @@
           sessionStorage.setItem('app_pass', inputPass);
           document.getElementById('login-screen').classList.add('hidden');
           document.getElementById('main-app').classList.remove('hidden');
+          await syncDatabaseWithCloudflare();
           startScanner();
         } else {
           errorEl.innerText = data.message || "رمز عبور اشتباه است!";
@@ -282,10 +361,11 @@
       location.reload();
     }
 
-    function checkAuthOnLoad() {
+    async function checkAuthOnLoad() {
       if (sessionStorage.getItem('is_logged_in') === 'true') {
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('main-app').classList.remove('hidden');
+        await syncDatabaseWithCloudflare();
         startScanner();
       }
     }
@@ -334,12 +414,14 @@
       const product = database[decodedText];
 
       if (product) {
+        playSuccessBeep();
         currentProduct = { barcode: decodedText, ...product };
         document.getElementById('product-name').innerText = product.name;
         document.getElementById('product-price').innerText = product.price.toLocaleString();
         document.getElementById('quantity').value = 1;
         document.getElementById('product-info').classList.remove('hidden');
       } else {
+        playErrorBeep();
         tempBarcode = decodedText;
         document.getElementById('modal-barcode').innerText = decodedText;
         document.getElementById('unknown-modal').classList.remove('hidden');
@@ -377,7 +459,7 @@
       document.getElementById('new-barcode').value = uniqueCode;
     }
 
-    function saveProduct() {
+    async function saveProduct() {
       const barcode = document.getElementById('new-barcode').value.trim();
       const name = document.getElementById('new-name').value.trim();
       const price = parseInt(document.getElementById('new-price').value);
@@ -387,14 +469,23 @@
         return;
       }
 
+      const saveBtn = document.getElementById('save-btn');
+      saveBtn.disabled = true;
+      saveBtn.innerText = "در حال ذخیره...";
+
       database[barcode] = { name: name, price: price };
       localStorage.setItem('grocery_db', JSON.stringify(database));
       
+      await saveDatabaseToCloudflare();
+
       document.getElementById('new-barcode').value = '';
       document.getElementById('new-name').value = '';
       document.getElementById('new-price').value = '';
       renderProductsList();
       
+      saveBtn.disabled = false;
+      saveBtn.innerText = "ذخیره کالا در سیستم";
+
       switchTab('scan');
     }
 
@@ -452,6 +543,7 @@
     }
 
     function switchTab(tab) {
+      initAudio();
       if (tab === 'scan') {
         document.getElementById('tab-scan').classList.remove('hidden');
         document.getElementById('tab-manage').classList.add('hidden');
@@ -554,11 +646,12 @@
       });
     }
 
-    function deleteProduct(barcode) {
+    async function deleteProduct(barcode) {
       if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
         delete database[barcode];
         localStorage.setItem('grocery_db', JSON.stringify(database));
         renderProductsList();
+        await saveDatabaseToCloudflare();
       }
     }
 
