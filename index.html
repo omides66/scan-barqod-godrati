@@ -145,7 +145,7 @@
             <div class="flex gap-2">
               <input type="text" id="new-barcode" placeholder="بارکد یا کد تولیدی" class="flex-1 p-2 border rounded-lg text-sm dir-ltr">
               <button onclick="generateRandomBarcode()" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-lg text-xs font-bold transition">
-                ⚡ تولید کد
+                ⚡ تولید کد سیستمی (۹۰)
               </button>
             </div>
           </div>
@@ -177,12 +177,13 @@
         <input type="file" id="import-file" class="hidden" accept=".json" onchange="importBackupJSON(event)">
       </div>
 
-      <!-- پنل مدیریت چاپ گروهی برچسب‌ها -->
+      <!-- پنل مخصوص انتخاب و چاپ گروهی بارکدهای سیستمی -->
       <div class="border-t pt-4">
         <div class="flex justify-between items-center mb-2">
-          <h3 class="font-bold text-gray-700 text-sm">کل کالاهای سیستم (<span id="products-count">0</span> کالا):</h3>
+          <h3 class="font-bold text-gray-800 text-sm">بارکدهای تولیدی سیستم (<span id="system-products-count">0</span> کالا):</h3>
           <button onclick="exportCSV()" class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300">خروجی اکسل</button>
         </div>
+        <p class="text-[11px] text-gray-500 mb-3">محصولاتی که کد آن‌ها با ۹۰ شروع می‌شود در این بخش آماده انتخاب و چاپ هستند.</p>
 
         <!-- ابزارهای انتخاب گروهی چاپ -->
         <div class="flex justify-between items-center bg-blue-50 p-2.5 rounded-xl border border-blue-100 mb-3">
@@ -191,13 +192,13 @@
             <span>انتخاب همه</span>
           </label>
 
-          <button onclick="executeMultiPrint()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow flex items-center gap-1">
-            🖨️ چاپ موارد انتخابی
+          <button onclick="executeMultiPrint()" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-xs font-bold transition shadow flex items-center gap-1">
+            🖨️ چاپ A4 موارد انتخابی
           </button>
         </div>
 
-        <!-- لیست اجناس بارکد سیستم -->
-        <div id="products-list" class="space-y-2 max-h-72 overflow-y-auto"></div>
+        <!-- لیست اجناس بارکد سیستم (شروع با 90) -->
+        <div id="system-products-list" class="space-y-2 max-h-80 overflow-y-auto"></div>
       </div>
     </div>
 
@@ -303,7 +304,7 @@
       isProcessingScan = true;
       try { html5QrCode.pause(); } catch(e){}
 
-      database = getDatabase(); // اطمینان از آخرین نسخه دیتابیس
+      database = getDatabase(); 
       const product = database[decodedText];
 
       if (product) {
@@ -351,7 +352,6 @@
       document.getElementById('new-barcode').value = uniqueCode;
     }
 
-    /* === ذخیره امن کالا بدون امکان بازنویسی یا پاک کردن قبلی‌ها === */
     function saveProduct() {
       const barcode = document.getElementById('new-barcode').value.trim();
       const name = document.getElementById('new-name').value.trim();
@@ -362,13 +362,8 @@
         return;
       }
 
-      // 1. خواندن داده‌های قبلی
       database = getDatabase();
-      
-      // 2. اضافه کردن کالا به لیست قبلی (Append)
       database[barcode] = { name: name, price: price };
-      
-      // 3. ذخیره مجدد
       saveDatabaseToStorage();
       
       document.getElementById('new-barcode').value = '';
@@ -393,10 +388,51 @@
       input.value = val;
     }
 
+    /* === رندر اختصاصی اجناس تولیدشده توسط سیستم (بارکد 90) === */
+    function renderProductsList() {
+      const listEl = document.getElementById('system-products-list');
+      database = getDatabase();
+      
+      // فیلتر هوشمند: فقط بارکدهایی که با 90 شروع می‌شوند
+      const systemBarcodes = Object.keys(database).filter(b => b.startsWith('90'));
+      document.getElementById('system-products-count').innerText = systemBarcodes.length;
+
+      if (systemBarcodes.length === 0) {
+        listEl.innerHTML = '<p class="text-center text-xs text-gray-400 py-3">هیچ کالا با بارکد سیستمی (شروع با ۹۰) ثبت نشده است.</p>';
+        return;
+      }
+
+      listEl.innerHTML = '';
+      systemBarcodes.forEach((barcode) => {
+        const item = database[barcode];
+        listEl.innerHTML += `
+          <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200 text-xs shadow-sm hover:border-blue-300 transition">
+            <div class="flex items-center gap-2">
+              <input type="checkbox" value="${barcode}" class="item-cb w-4 h-4 rounded text-blue-600 cursor-pointer">
+              <div>
+                <p class="font-bold text-gray-800">${item.name}</p>
+                <p class="text-gray-400 dir-ltr text-right font-mono">${barcode} - ${item.price.toLocaleString()} تومان</p>
+              </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+              <div class="flex items-center border border-gray-300 rounded-lg bg-gray-50 overflow-hidden">
+                <button onclick="changePrintCount('${barcode}', -1)" class="w-7 h-7 bg-gray-200 hover:bg-gray-300 font-bold text-gray-700 flex items-center justify-center text-sm active:bg-gray-400">-</button>
+                <input type="number" id="print-count-${barcode}" value="1" min="1" readonly class="w-8 text-center font-bold bg-transparent outline-none text-xs text-blue-700">
+                <button onclick="changePrintCount('${barcode}', 1)" class="w-7 h-7 bg-gray-200 hover:bg-gray-300 font-bold text-gray-700 flex items-center justify-center text-sm active:bg-gray-400">+</button>
+              </div>
+              <button onclick="deleteProduct('${barcode}')" class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="حذف کالا">🗑️</button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    /* === چاپ گروهی و دقیق بر روی برگه A4 === */
     function executeMultiPrint() {
       const checkboxes = document.querySelectorAll('.item-cb:checked');
       if (checkboxes.length === 0) {
-        alert("لطفاً حداقل یک کالا را برای چاپ انتخاب کنید.");
+        alert("لطفاً حداقل یک کالا را انتخاب کنید.");
         return;
       }
 
@@ -419,7 +455,7 @@
       const printContainer = document.getElementById('print-page-a4');
       printContainer.innerHTML = '';
 
-      const ITEMS_PER_PAGE = 24;
+      const ITEMS_PER_PAGE = 24; // ۲۴ لیبل در هر برگه A4
       let currentPage = null;
       const svgTasks = [];
 
@@ -541,46 +577,6 @@
       document.body.removeChild(link);
     }
 
-    /* === رندر لیست همه اجناس (اصلاح شده: بدون فیلتر 90) === */
-    function renderProductsList() {
-      const listEl = document.getElementById('products-list');
-      database = getDatabase();
-      
-      // اصلاح مهم: گرفتن همه بارکدها بدون استثنا
-      const allBarcodes = Object.keys(database);
-      document.getElementById('products-count').innerText = allBarcodes.length;
-
-      if (allBarcodes.length === 0) {
-        listEl.innerHTML = '<p class="text-center text-xs text-gray-400 py-3">هیچ کالایی در سیستم یافت نشد.</p>';
-        return;
-      }
-
-      listEl.innerHTML = '';
-      allBarcodes.forEach((barcode) => {
-        const item = database[barcode];
-        listEl.innerHTML += `
-          <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200 text-xs shadow-sm">
-            <div class="flex items-center gap-2">
-              <input type="checkbox" value="${barcode}" class="item-cb w-4 h-4 rounded text-blue-600 cursor-pointer">
-              <div>
-                <p class="font-bold text-gray-800">${item.name}</p>
-                <p class="text-gray-400 dir-ltr text-right">${barcode} - ${item.price.toLocaleString()} تومان</p>
-              </div>
-            </div>
-            
-            <div class="flex items-center gap-2">
-              <div class="flex items-center border border-gray-300 rounded-lg bg-gray-50 overflow-hidden">
-                <button onclick="changePrintCount('${barcode}', -1)" class="w-6 h-6 bg-gray-200 hover:bg-gray-300 font-bold text-gray-700 flex items-center justify-center">-</button>
-                <input type="number" id="print-count-${barcode}" value="1" min="1" readonly class="w-8 text-center font-bold bg-transparent outline-none text-xs">
-                <button onclick="changePrintCount('${barcode}', 1)" class="w-6 h-6 bg-gray-200 hover:bg-gray-300 font-bold text-gray-700 flex items-center justify-center">+</button>
-              </div>
-              <button onclick="deleteProduct('${barcode}')" class="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition">🗑️</button>
-            </div>
-          </div>
-        `;
-      });
-    }
-
     function deleteProduct(barcode) {
       if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
         database = getDatabase();
@@ -590,7 +586,6 @@
       }
     }
 
-    /* === توابع پشتیبان‌گیری فایل JSON برای جلوگیری از پریدن اطلاعات === */
     function exportBackupJSON() {
       database = getDatabase();
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(database, null, 2));
@@ -612,11 +607,10 @@
           const importedData = JSON.parse(e.target.result);
           if (typeof importedData === 'object') {
             database = getDatabase();
-            // ادغام کالاها با حفظ کالاهای موجود
             database = { ...database, ...importedData };
             saveDatabaseToStorage();
             renderProductsList();
-            alert("پشتیبان با موفقیت بازگردانی و با اجناس قبلی ادغام شد.");
+            alert("پشتیبان با موفقیت بازگردانی شد.");
           }
         } catch (err) {
           alert("فایل پشتیبان معتبر نیست.");
