@@ -98,7 +98,7 @@
           <div><span id="total-price">0</span> <span class="text-sm font-normal">تومان</span></div>
         </div>
 
-        <button onclick="sendToTelegram()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition shadow">
+        <button id="send-btn" onclick="sendToTelegram()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition shadow">
           ارسال فاکتور به تلگرام
         </button>
       </div>
@@ -172,8 +172,8 @@
   <div id="print-page-a4" class="hidden"></div>
 
   <script>
-    const BOT_TOKEN = "__BOT_TOKEN__";
-    const CHAT_ID = "__CHAT_ID__";
+    // ⚠️ لینک آدرس Cloudflare Worker خود را در خط زیر جایگزین کنید:
+    const WORKER_URL = "https://godrati.ez-1332d6.workers.dev";
 
     let database = JSON.parse(localStorage.getItem('grocery_db')) || {};
     let lastScannedBarcode = "";
@@ -424,28 +424,44 @@
       }
     }
 
-    function sendToTelegram() {
+    async function sendToTelegram() {
       if (cart.length === 0) { alert("سبد خرید خالی است!"); return; }
 
-      let text = "🛒 *فاکتور جدید خرید*\n\n";
+      const sendBtn = document.getElementById('send-btn');
+      sendBtn.disabled = true;
+      sendBtn.innerText = "در حال ارسال...";
+
+      let text = "🛒 <b>فاکتور جدید خرید</b>\n\n";
       let totalSum = 0;
       cart.forEach((item, i) => {
-        text += `${i + 1}. ${item.name}\n   تعداد: ${item.quantity} | قیمت: ${item.total.toLocaleString()} تومان\n`;
+        text += `${i + 1}. <b>${item.name}</b>\n   تعداد: ${item.quantity} | قیمت: ${item.total.toLocaleString()} تومان\n`;
         totalSum += item.total;
       });
-      text += `\n💰 *جمع کل: ${totalSum.toLocaleString()} تومان*`;
+      text += `\n💰 <b>جمع کل: ${totalSum.toLocaleString()} تومان</b>`;
 
-      fetch(`https://telegram-bot-api.vercel.app/bot${BOT_TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: CHAT_ID, text: text, parse_mode: "Markdown" })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.ok) { alert("فاکتور به تلگرام ارسال شد!"); cart = []; updateCartUI(); }
-        else { alert("خطا در ارسال به تلگرام."); }
-      })
-      .catch(() => alert("ارتباط با تلگرام برقرار نشد."));
+      try {
+        const response = await fetch(WORKER_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.ok) {
+          alert("فاکتور به تلگرام ارسال شد!");
+          cart = [];
+          updateCartUI();
+        } else {
+          alert("خطا در ارسال به تلگرام. لطفا تنظیمات Worker را بررسی کنید.");
+        }
+      } catch (err) {
+        alert("ارتباط با تلگرام برقرار نشد.");
+        console.error("Error sending message:", err);
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.innerText = "ارسال فاکتور به تلگرام";
+      }
     }
 
     window.addEventListener('DOMContentLoaded', startScanner);
