@@ -511,9 +511,12 @@
         if (response.ok && data.success) {
           sessionStorage.setItem('is_logged_in', 'true');
           sessionStorage.setItem('app_pass', inputPass);
+          sessionStorage.setItem('user_role', data.role || 'admin');
+          applyRoleUI();
           document.getElementById('login-screen').classList.add('hidden');
           document.getElementById('main-app').classList.remove('hidden');
           await syncDatabaseWithCloudflare();
+          refreshProviderLabel();
           startScanner();
         } else {
           errorEl.innerText = data.message || "رمز عبور اشتباه است!";
@@ -538,10 +541,39 @@
 
     async function checkAuthOnLoad() {
       if (sessionStorage.getItem('is_logged_in') === 'true') {
+        applyRoleUI();
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('main-app').classList.remove('hidden');
         await syncDatabaseWithCloudflare();
+        refreshProviderLabel();
         startScanner();
+      }
+    }
+
+    // اعمال سطح دسترسی: تب تنظیمات فقط برای ادمین نمایش داده می‌شود
+    function applyRoleUI() {
+      var isAdmin = sessionStorage.getItem('user_role') !== 'seller';
+      document.getElementById('tab-settings-btn').style.display = isAdmin ? '' : 'none';
+      if (!isAdmin) {
+        document.getElementById('tab-settings').classList.add('hidden');
+      }
+    }
+
+    // به‌روزرسانی متن دکمه ارسال فاکتور بر اساس پیام‌رسان تنظیم‌شده
+    async function refreshProviderLabel() {
+      const sendBtn = document.getElementById('send-btn');
+      try {
+        const pass = sessionStorage.getItem('app_pass');
+        const res = await fetch(`${WORKER_URL}/settings`, {
+          headers: { "Authorization": `Bearer ${pass}` }
+        });
+        if (res.ok) {
+          const s = await res.json();
+          const name = s.provider === 'bale' ? 'بله' : 'تلگرام';
+          sendBtn.innerText = 'ارسال فاکتور به ' + name;
+        }
+      } catch (err) {
+        console.error("خطا در خواندن نوع پیام‌رسان:", err);
       }
     }
 
@@ -1214,6 +1246,7 @@
           alert("تنظیمات با موفقیت ذخیره شد. ✅");
           document.getElementById('bot-token').value = '';
           loadBotSettings();
+          refreshProviderLabel();
         } else {
           alert("خطا در ذخیره تنظیمات: " + (data.error || "خطای نامشخص"));
         }
@@ -1351,7 +1384,8 @@
         console.error("Error sending message:", err);
       } finally {
         sendBtn.disabled = false;
-        sendBtn.innerText = "ارسال فاکتور به تلگرام";
+        sendBtn.innerText = "ارسال فاکتور";
+        refreshProviderLabel(); // پس از پاسخ سرور، متن به «ارسال فاکتور به بله/تلگرام» تغییر می‌کند
       }
     }
 
