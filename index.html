@@ -133,9 +133,38 @@
           <li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>
         </ul>
 
-        <div class="flex justify-between items-center font-bold text-lg text-gray-800 border-t pt-3 mb-4">
-          <span>جمع کل:</span>
-          <div><span id="total-price">0</span> <span class="text-sm font-normal">تومان</span></div>
+        <!-- بخش مبالغ و اعمال درصد تخفیف -->
+        <div class="space-y-2.5 border-t pt-3 mb-4">
+          <!-- جمع اولیه اقلام -->
+          <div class="flex justify-between items-center text-xs text-gray-600">
+            <span>جمع اقلام فاکتور:</span>
+            <span class="font-bold text-gray-800"><span id="subtotal-price">0</span> تومان</span>
+          </div>
+
+          <!-- باکس اعمال تخفیف درصدی -->
+          <div class="flex items-center justify-between gap-2 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+            <span class="text-xs font-bold text-amber-900">درصد تخفیف به مشتری:</span>
+            <div class="flex items-center gap-1">
+              <div class="flex items-center border border-amber-300 rounded-lg bg-white overflow-hidden shadow-sm">
+                <button type="button" onclick="changeDiscount(-1)" class="w-8 h-7 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-sm active:bg-amber-300 transition flex items-center justify-center">−</button>
+                <input type="number" id="discount-percent" value="0" min="0" max="100" oninput="updateCartUI()" class="w-12 text-center font-bold text-xs text-amber-800 bg-transparent outline-none">
+                <button type="button" onclick="changeDiscount(1)" class="w-8 h-7 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-sm active:bg-amber-300 transition flex items-center justify-center">+</button>
+              </div>
+              <span class="text-xs text-amber-800 font-bold">٪</span>
+            </div>
+          </div>
+
+          <!-- ردیف نمایش مبلغ کسر شده تخفیف -->
+          <div id="discount-row" class="hidden flex justify-between items-center text-xs text-red-600 font-semibold bg-red-50 px-2.5 py-1.5 rounded-lg border border-red-100">
+            <span>تخفیف کسر شده (<span id="discount-display-percent">0</span>٪):</span>
+            <span>−<span id="discount-amount">0</span> تومان</span>
+          </div>
+
+          <!-- مبلغ نهایی پرداختی -->
+          <div class="flex justify-between items-center font-bold text-base text-gray-800 border-t pt-2">
+            <span>مبلغ نهایی پرداختی:</span>
+            <div><span id="total-price" class="text-blue-700 text-lg">0</span> <span class="text-xs font-normal text-gray-600">تومان</span></div>
+          </div>
         </div>
 
         <button id="send-btn" onclick="sendToTelegram()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition shadow">
@@ -201,11 +230,11 @@
         <div class="flex justify-between items-center mb-2 gap-1 flex-wrap">
           <h3 class="font-bold text-gray-700 text-sm">لیست اجناس (<span id="products-count">0</span> کالا):</h3>
           <div class="flex items-center gap-1.5">
-            <button onclick="document.getElementById('csv-file-input').click()" class="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg hover:bg-blue-100 font-bold transition">
+            <button type="button" onclick="document.getElementById('csv-file-input').click()" class="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg hover:bg-blue-100 font-bold transition">
               📥 ورود اکسل (CSV)
             </button>
             <input type="file" id="csv-file-input" accept=".csv,text/csv" class="hidden" onchange="importCSV(event)">
-            <button onclick="exportCSV()" class="text-xs bg-gray-200 text-gray-700 px-2.5 py-1 rounded-lg hover:bg-gray-300 font-bold transition">
+            <button type="button" onclick="exportCSV()" class="text-xs bg-gray-200 text-gray-700 px-2.5 py-1 rounded-lg hover:bg-gray-300 font-bold transition">
               📤 خروجی اکسل
             </button>
           </div>
@@ -849,14 +878,39 @@
       try { html5QrCode.resume(); } catch(e){}
     }
 
+    // تنظیم درصد تخفیف با دکمه‌های + و -
+    function changeDiscount(delta) {
+      var discInput = document.getElementById('discount-percent');
+      if (!discInput) return;
+      var val = (parseInt(discInput.value) || 0) + delta;
+      if (val < 0) val = 0;
+      if (val > 100) val = 100;
+      discInput.value = val;
+      updateCartUI();
+    }
+
+    // به‌روزرسانی رابط کاربری سبد خرید با کسر خودکار درصد تخفیف
     function updateCartUI() {
       const cartList = document.getElementById('cart-list');
+      const subtotalEl = document.getElementById('subtotal-price');
       const totalPriceEl = document.getElementById('total-price');
+      const discountRow = document.getElementById('discount-row');
+      const discountAmountEl = document.getElementById('discount-amount');
+      const discountDisplayPercent = document.getElementById('discount-display-percent');
+      const discInput = document.getElementById('discount-percent');
+
+      var discountPercent = discInput ? (parseInt(discInput.value) || 0) : 0;
+      if (discountPercent < 0) discountPercent = 0;
+      if (discountPercent > 100) discountPercent = 100;
+
       if (cart.length === 0) {
         cartList.innerHTML = '<li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>';
-        totalPriceEl.innerText = "0";
+        if (subtotalEl) subtotalEl.innerText = "0";
+        if (totalPriceEl) totalPriceEl.innerText = "0";
+        if (discountRow) discountRow.classList.add('hidden');
         return;
       }
+
       cartList.innerHTML = '';
       let sum = 0;
       cart.forEach((item, index) => {
@@ -865,15 +919,29 @@
           <li class="py-2 flex justify-between items-center">
             <div>
               <span class="font-medium text-gray-800">${item.name}</span>
-              <span class="text-xs text-gray-400 block">${item.quantity} عدد × ${Number(item.price).toLocaleString()}</span>
+              <span class="text-xs text-gray-400 block">${item.quantity} عدد × ${item.price.toLocaleString()}</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="font-semibold">${Number(item.total).toLocaleString()} تومان</span>
+              <span class="font-semibold">${item.total.toLocaleString()} تومان</span>
               <button onclick="removeFromCart(${index})" class="text-red-500 font-bold px-1 text-xs">✕</button>
             </div>
           </li>`;
       });
-      totalPriceEl.innerText = sum.toLocaleString();
+
+      if (subtotalEl) subtotalEl.innerText = sum.toLocaleString();
+
+      var discountAmount = Math.round((sum * discountPercent) / 100);
+      var finalTotal = sum - discountAmount;
+
+      if (discountPercent > 0) {
+        if (discountRow) discountRow.classList.remove('hidden');
+        if (discountDisplayPercent) discountDisplayPercent.innerText = discountPercent;
+        if (discountAmountEl) discountAmountEl.innerText = discountAmount.toLocaleString();
+      } else {
+        if (discountRow) discountRow.classList.add('hidden');
+      }
+
+      if (totalPriceEl) totalPriceEl.innerText = finalTotal.toLocaleString();
     }
 
     function removeFromCart(index) {
@@ -1026,6 +1094,7 @@
       reader.readAsText(file, "UTF-8");
     }
 
+    // ارسال فاکتور رسید دیجیتال به همراه درصد و مبلغ تخفیف به تلگرام
     async function sendToTelegram() {
       if (cart.length === 0) { alert("سبد خرید خالی است!"); return; }
 
@@ -1061,9 +1130,24 @@
         }
       }
 
+      // محاسبه تخفیف
+      var discInput = document.getElementById('discount-percent');
+      var discountPercent = discInput ? (parseInt(discInput.value) || 0) : 0;
+      if (discountPercent < 0) discountPercent = 0;
+      if (discountPercent > 100) discountPercent = 100;
+
+      var discountAmount = Math.round((totalSum * discountPercent) / 100);
+      var finalPayable = totalSum - discountAmount;
+
       text += "\n━━━━━━━━━━━━━━━━━━━━\n";
       text += "📦 <b>تعداد کل اقلام:</b> " + totalItemsCount + " عدد\n";
-      text += "💰 <b>جمع کل فاکتور:</b> <b>" + totalSum.toLocaleString() + " تومان</b>\n";
+      if (discountPercent > 0) {
+        text += "💵 <b>جمع فاکتور:</b> " + totalSum.toLocaleString() + " تومان\n";
+        text += "🎁 <b>تخفیف (" + discountPercent + "٪):</b> " + discountAmount.toLocaleString() + " تومان کسر شد\n";
+        text += "💰 <b>مبلغ نهایی پرداختی:</b> <b>" + finalPayable.toLocaleString() + " تومان</b>\n";
+      } else {
+        text += "💰 <b>جمع کل فاکتور:</b> <b>" + totalSum.toLocaleString() + " تومان</b>\n";
+      }
       text += "━━━━━━━━━━━━━━━━━━━━";
 
       try {
@@ -1082,6 +1166,9 @@
         if (response.ok && data.ok) {
           alert("فاکتور با موفقیت به تلگرام ارسال شد!");
           cart = [];
+          if (document.getElementById('discount-percent')) {
+            document.getElementById('discount-percent').value = 0;
+          }
           updateCartUI();
         } else {
           alert("خطا در ارسال به تلگرام.");
