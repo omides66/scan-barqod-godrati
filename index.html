@@ -1197,4 +1197,232 @@
       var rawPrice = document.getElementById('edit-price').value.replace(/,/g, '');
       var price = parseInt(rawPrice);
 
-      if (!name || isNaN(price
+      if (!name || isNaN(price)) {
+        alert("لطفاً نام و قیمت کالا را به درستی وارد کنید.");
+        return;
+      }
+
+      var saveBtn = document.getElementById('edit-save-btn');
+      saveBtn.disabled = true;
+      saveBtn.innerText = "در حال ذخیره...";
+
+      database[barcode] = { name: name, price: price };
+      localStorage.setItem('grocery_db', JSON.stringify(database));
+      await saveDatabaseToCloudflare();
+
+      renderProductsList();
+      closeEditModal();
+
+      saveBtn.disabled = false;
+      saveBtn.innerText = "ذخیره تغییرات";
+    }
+
+    async function deleteProduct(barcode) {
+      if (confirm("آیا از حذف این کالا مطمئن هستید؟")) {
+        delete database[barcode];
+        localStorage.setItem('grocery_db', JSON.stringify(database));
+        renderProductsList();
+        await saveDatabaseToCloudflare();
+      }
+    }
+
+    // تابع ورود فایل اکسل (CSV) برای به‌روزرسانی اجناس
+    async function importCSV(event) {
+      var file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      var reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          var content = e.target.result;
+          if (content.charCodeAt(0) === 0xFEFF) {
+            content = content.substr(1);
+          }
+          var lines = content.split(/\r\n|\n/);
+          var updatedCount = 0;
+
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line) continue;
+
+            var parts = line.split(',');
+            if (parts.length >= 3) {
+              var barcode = parts[0].trim();
+              var name = parts[1].trim();
+              var priceRaw = parts[2].replace(/[^\d]/g, '');
+              var price = parseInt(priceRaw);
+
+              if (barcode && name && !isNaN(price)) {
+                database[barcode] = { name: name, price: price };
+                updatedCount++;
+              }
+            }
+          }
+
+          if (updatedCount > 0) {
+            localStorage.setItem('grocery_db', JSON.stringify(database));
+            await saveDatabaseToCloudflare();
+            renderProductsList();
+            alert(updatedCount + " کالا با موفقیت از فایل اکسل وارد و به‌روزرسانی شد.");
+          } else {
+            alert("کالایی در فایل اکسل یافت نشد یا فرمت آن هم‌خوانی ندارد.");
+          }
+        } catch(err) {
+          console.error("خطا در پردازش فایل اکسل:", err);
+          alert("خطا در پردازش فایل اکسل!");
+        } finally {
+          event.target.value = '';
+        }
+      };
+
+      reader.readAsText(file, "UTF-8");
+    }
+
+    // توابع ارسال فاکتور به تلگرام یا بله
+    async function sendToTelegramAPI(messageText, token, chatId) {
+      try {
+        var bodyData = {
+          action: "send_invoice",
+          password: sessionStorage.getItem('app_pass'),
+          message: messageText
+        };
+        if (token) bodyData.token = token;
+        if (chatId) bodyData.chat_id = chatId;
+
+        var response = await fetch(WORKER_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bodyData)
+        });
+        var data = await response.json();
+        return { ok: response.ok && data.ok, error: data.description || data.message };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
+
+    async function sendToBaleAPI(messageText, token, chatId) {
+      if (!token || !chatId) {
+        return { ok: false, error: "توکن یا شناسه بازوی بله تعریف نشده است." };
+      }
+      try {
+        // ارسال مستقیم به API بله (پشتیبانی از پروتکل Bot API بله)
+        var response = await fetch("https://tapi.bale.ai/bot" + token + "/sendMessage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: messageText,
+            parse_mode: "HTML"
+          })
+        });
+        var data = await response.json();
+        return { ok: response.ok && data.ok, error: data.description || "خطا در بله" };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
+
+    async function sendInvoice() {
+      if (cart.length === 0) { alert("سبد خرید خالی است!"); return; }
+
+      var sendBtn = document.getElementById('send-btn');
+      sendBtn.disabled = true;
+      sendBtn.innerText = "در حال ارسال فاکتور...";
+
+      // ساخت متن رسید فاکتور
+      var now = new Date();
+      var dateStr = now.toLocaleDateString('fa-IR');
+      var timeStr = now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+
+      var totalSum = 0;
+      var totalItemsCount = 0;
+
+      var text = "🧾 <b>فاکتور جدید فروشگاه</b>\n";
+      text += "📅 تاریخ: <code>" + dateStr + "</code> — ساعت: <code>" + timeStr + "</code>\n";
+      text += "━━━━━━━━━━━━━━━━━━━━\n\n";
+
+      for (var i = 0; i < cart.length; i++) {
+        var item = cart[i];
+        totalSum += item.total;
+        totalItemsCount += item.quantity;
+
+        var unitPrice = item.price.toLocaleString();
+        var totalPrice = item.total.toLocaleString();
+
+        text += (i + 1) + "️⃣ <b>" + item.name + "</b>\n";
+        text += "▫️ " + item.quantity + " عدد × " + unitPrice + " = <b>" + totalPrice + " تومان</b>\n";
+
+        if (i < cart.length - 1) {
+          text += "────────────────────\n";
+        }
+      }
+
+      // محاسبه تخفیف
+      var discInput = document.getElementById('discount-percent');
+      var discountPercent = discInput ? (parseInt(discInput.value) || 0) : 0;
+      if (discountPercent < 0) discountPercent = 0;
+      if (discountPercent > 100) discountPercent = 100;
+
+      var discountAmount = Math.round((totalSum * discountPercent) / 100);
+      var finalPayable = totalSum - discountAmount;
+
+      text += "\n━━━━━━━━━━━━━━━━━━━━\n";
+      text += "📦 <b>تعداد کل اقلام:</b> " + totalItemsCount + " عدد\n";
+      if (discountPercent > 0) {
+        text += "💵 <b>جمع فاکتور:</b> " + totalSum.toLocaleString() + " تومان\n";
+        text += "🎁 <b>تخفیف (" + discountPercent + "٪):</b> " + discountAmount.toLocaleString() + " تومان کسر شد\n";
+        text += "💰 <b>مبلغ نهایی پرداختی:</b> <b>" + finalPayable.toLocaleString() + " تومان</b>\n";
+      } else {
+        text += "💰 <b>جمع کل فاکتور:</b> <b>" + totalSum.toLocaleString() + " تومان</b>\n";
+      }
+      text += "━━━━━━━━━━━━━━━━━━━━";
+
+      var platform = appSettings.platform || 'telegram';
+      var tgSuccess = false;
+      var baleSuccess = false;
+      var errors = [];
+
+      try {
+        if (platform === 'telegram' || platform === 'both') {
+          var tgRes = await sendToTelegramAPI(text, appSettings.telegramToken, appSettings.telegramChatId);
+          if (tgRes.ok) {
+            tgSuccess = true;
+          } else {
+            errors.push("تلگرام: " + (tgRes.error || "خطای اتصال"));
+          }
+        }
+
+        if (platform === 'bale' || platform === 'both') {
+          var baleRes = await sendToBaleAPI(text, appSettings.baleToken, appSettings.baleChatId);
+          if (baleRes.ok) {
+            baleSuccess = true;
+          } else {
+            errors.push("بله: " + (baleRes.error || "تنظیمات بازو را بررسی کنید"));
+          }
+        }
+
+        var isAnySuccess = tgSuccess || baleSuccess;
+        if (isAnySuccess) {
+          var successDest = (tgSuccess && baleSuccess) ? "تلگرام و بله" : (tgSuccess ? "تلگرام" : "بله");
+          alert("فاکتور با موفقیت به " + successDest + " ارسال شد!");
+          cart = [];
+          if (document.getElementById('discount-percent')) {
+            document.getElementById('discount-percent').value = 0;
+          }
+          updateCartUI();
+        } else {
+          alert("خطا در ارسال فاکتور:\n" + errors.join('\n'));
+        }
+      } catch (err) {
+        alert("خطا در ارسال: " + err.message);
+      } finally {
+        sendBtn.disabled = false;
+        updateSendButtonLabel();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', checkAuthOnLoad);
+  </script>
+</body>
+</html>
