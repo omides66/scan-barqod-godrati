@@ -87,10 +87,11 @@
     </div>
 
     <!-- تب‌های بالای صفحه -->
-    <div class="flex border-b mb-4">
-      <button id="tab-scan-btn" onclick="switchTab('scan')" class="flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm">فروش و اسکن</button>
-      <button id="tab-manage-btn" onclick="switchTab('manage')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">مدیریت اجناس</button>
-      <button id="tab-print-btn" onclick="switchTab('print')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">چاپ بارکدها</button>
+    <div class="flex border-b mb-4 text-center">
+      <button id="tab-scan-btn" onclick="switchTab('scan')" class="flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-[11px] sm:text-xs">فروش و اسکن</button>
+      <button id="tab-manage-btn" onclick="switchTab('manage')" class="flex-1 py-2 font-bold text-gray-500 text-[11px] sm:text-xs">مدیریت اجناس</button>
+      <button id="tab-print-btn" onclick="switchTab('print')" class="flex-1 py-2 font-bold text-gray-500 text-[11px] sm:text-xs">چاپ بارکدها</button>
+      <button id="tab-settings-btn" onclick="switchTab('settings')" class="flex-1 py-2 font-bold text-gray-500 text-[11px] sm:text-xs">⚙️ تنظیمات</button>
     </div>
 
     <!-- ==================== بخش فروش و اسکن ==================== -->
@@ -167,8 +168,8 @@
           </div>
         </div>
 
-        <button id="send-btn" onclick="sendToTelegram()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition shadow">
-          ارسال فاکتور به تلگرام
+        <button id="send-btn" onclick="sendInvoice()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition shadow flex items-center justify-center gap-2">
+          <span>📤 ارسال فاکتور</span>
         </button>
       </div>
     </div>
@@ -264,6 +265,105 @@
       <div id="generated-barcodes-list" class="space-y-3 max-h-[380px] overflow-y-auto pr-1"></div>
     </div>
 
+    <!-- ==================== بخش تنظیمات پیام‌رسان‌ها (تلگرام و بله) ==================== -->
+    <div id="tab-settings" class="hidden space-y-4">
+      
+      <!-- انتخاب پیام‌رسان فعال -->
+      <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+        <h3 class="font-bold text-gray-800 text-sm mb-3">📡 مقصد ارسال فاکتور فروش:</h3>
+        <div class="grid grid-cols-3 gap-2 text-center text-xs font-bold">
+          <label class="cursor-pointer border rounded-xl p-2.5 bg-white flex flex-col items-center gap-1.5 transition hover:bg-blue-50 border-gray-300 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50 has-[:checked]:text-blue-700">
+            <input type="radio" name="active_platform" value="telegram" class="hidden" onchange="updatePlatformSelection(this.value)">
+            <span class="text-base">✈️</span>
+            <span>فقط تلگرام</span>
+          </label>
+          <label class="cursor-pointer border rounded-xl p-2.5 bg-white flex flex-col items-center gap-1.5 transition hover:bg-green-50 border-gray-300 has-[:checked]:border-green-600 has-[:checked]:bg-green-50 has-[:checked]:text-green-700">
+            <input type="radio" name="active_platform" value="bale" class="hidden" onchange="updatePlatformSelection(this.value)">
+            <span class="text-base">🍃</span>
+            <span>فقط بله</span>
+          </label>
+          <label class="cursor-pointer border rounded-xl p-2.5 bg-white flex flex-col items-center gap-1.5 transition hover:bg-purple-50 border-gray-300 has-[:checked]:border-purple-600 has-[:checked]:bg-purple-50 has-[:checked]:text-purple-700">
+            <input type="radio" name="active_platform" value="both" class="hidden" onchange="updatePlatformSelection(this.value)">
+            <span class="text-base">🔄</span>
+            <span>هر دو پلتفرم</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- تنظیمات اختصاصی تلگرام -->
+      <div class="bg-blue-50/70 p-4 rounded-xl border border-blue-200 space-y-3">
+        <div class="flex items-center justify-between pb-1 border-b border-blue-100">
+          <span class="font-bold text-blue-900 text-xs sm:text-sm flex items-center gap-1.5">
+            <span>✈️</span> تنظیمات ربات تلگرام
+          </span>
+          <button type="button" onclick="testSendMessage('telegram')" class="text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg font-bold transition">
+            ارسال تست تلگرام
+          </button>
+        </div>
+        <div>
+          <label class="text-[11px] text-gray-600 block mb-1">توکن ربات تلگرام (Bot Token):</label>
+          <input type="text" id="setting-tg-token" placeholder="مثلاً: 123456789:ABCdefGhIJKlmNoPQRstuVWxYZ" class="w-full p-2 border rounded-lg text-xs dir-ltr bg-white">
+          <span class="text-[10px] text-gray-400 block mt-0.5">(در صورت خالی گذاشتن، از ربات متصل به ورکر استفاده می‌شود)</span>
+        </div>
+        <div>
+          <label class="text-[11px] text-gray-600 block mb-1">شناسه عددی دریافت‌کننده (Chat ID):</label>
+          <input type="text" id="setting-tg-chatid" placeholder="مثلاً: 123456789 یا -100123456789" class="w-full p-2 border rounded-lg text-xs dir-ltr bg-white">
+        </div>
+      </div>
+
+      <!-- تنظیمات اختصاصی پیام‌رسان بله -->
+      <div class="bg-green-50/70 p-4 rounded-xl border border-green-200 space-y-3">
+        <div class="flex items-center justify-between pb-1 border-b border-green-100">
+          <span class="font-bold text-green-900 text-xs sm:text-sm flex items-center gap-1.5">
+            <span>🍃</span> تنظیمات بازوی بله (Bale)
+          </span>
+          <button type="button" onclick="testSendMessage('bale')" class="text-[11px] bg-green-600 hover:bg-green-700 text-white px-2.5 py-1 rounded-lg font-bold transition">
+            ارسال تست بله
+          </button>
+        </div>
+        <div>
+          <label class="text-[11px] text-gray-600 block mb-1">توکن بازوی بله (Bot Token):</label>
+          <input type="text" id="setting-bale-token" placeholder="توکن دریافتی از BotFather بله" class="w-full p-2 border rounded-lg text-xs dir-ltr bg-white">
+        </div>
+        <div>
+          <label class="text-[11px] text-gray-600 block mb-1">شناسه چت / کاربری بله (Chat ID):</label>
+          <input type="text" id="setting-bale-chatid" placeholder="مثلاً شناسه عددی شما در بله" class="w-full p-2 border rounded-lg text-xs dir-ltr bg-white">
+        </div>
+      </div>
+
+      <!-- دکمه ذخیره تنظیمات -->
+      <button type="button" onclick="saveAppSettings()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-bold text-sm shadow transition">
+        💾 ذخیره تنظیمات پیام‌رسان‌ها
+      </button>
+
+      <!-- راهنمای ساخت ربات تلگرام و بله -->
+      <div class="bg-white p-4 rounded-xl border border-gray-200 text-xs space-y-4">
+        <h4 class="font-bold text-gray-800 text-sm flex items-center gap-1">
+          📖 راهنمای راه‌اندازی ربات‌ها (گام‌به‌گام):
+        </h4>
+
+        <!-- راهنمای تلگرام -->
+        <div class="border-r-2 border-blue-500 pr-3 space-y-1 text-gray-600 leading-relaxed">
+          <p class="font-bold text-blue-900">🔹 راهنمای دریافت توکن و چت‌آیدی تلگرام:</p>
+          <p>۱. در تلگرام وارد ربات <code>@BotFather</code> شوید و دستور <code>/newbot</code> را بفرستید.</p>
+          <p>۲. یک نام و سپس یک آیدی انگلیسی (با پسوند bot) انتخاب کنید تا توکن (Token) به شما داده شود.</p>
+          <p>۳. برای به دست آوردن Chat ID خود، به ربات <code>@userinfobot</code> پیام دهید و عدد روبه‌روی <b>Id</b> را کپی کنید.</p>
+          <p>۴. <b>بسیار مهم:</b> حتماً وارد ربات خودتان شوید و دکمه <b>Start</b> را بزنید تا ربات بتواند به شما فاکتور بفرستد.</p>
+        </div>
+
+        <!-- راهنمای بله -->
+        <div class="border-r-2 border-green-500 pr-3 space-y-1 text-gray-600 leading-relaxed">
+          <p class="font-bold text-green-900">🔹 راهنمای دریافت توکن و شناسه بله (Bale):</p>
+          <p>۱. در اپلیکیشن بله به آیدی <code>@BotFather</code> (بازوی بات‌فادر) پیام دهید.</p>
+          <p>۲. گزینه «ایجاد بازوی جدید» را بزنید و نام و آیدی برای بازوی خود تعیین کنید.</p>
+          <p>۳. توکن بازو (API Token) را کپی کرده و در کادر بالا قرار دهید.</p>
+          <p>۴. برای به دست آوردن شناسه عددی (Chat ID)، در بله به بازوی <code>@UserInfoBot</code> پیام دهید یا از شناسه عددی کاربری‌تان استفاده کنید.</p>
+          <p>۵. <b>بسیار مهم:</b> وارد بازوی ساخته‌شده خود در بله شوید و دکمه <b>شروع (Start)</b> را بزنید.</p>
+        </div>
+      </div>
+
+    </div>
+
   </div>
 
   <!-- پاپ‌آپ مدال ثبت کالای ناشناخته -->
@@ -330,6 +430,15 @@
     let isTorchOn = false;
     let isProcessingScan = false;
     let audioCtx = null;
+
+    // بارگذاری تنظیمات پیام‌رسان‌ها از حافظه محلی
+    let appSettings = JSON.parse(localStorage.getItem('invoice_app_settings')) || {
+      platform: 'telegram',
+      telegramToken: '',
+      telegramChatId: '',
+      baleToken: '',
+      baleChatId: ''
+    };
 
     // تابع فرمت جداکننده ۳ رقم ۳ رقم برای ورودی قیمت
     function formatPriceInput(input) {
@@ -491,6 +600,7 @@
         document.getElementById('main-app').classList.remove('hidden');
         await syncDatabaseWithCloudflare();
         startScanner();
+        updateSendButtonLabel();
       }
     }
 
@@ -672,23 +782,117 @@
       document.getElementById('tab-scan').classList.add('hidden');
       document.getElementById('tab-manage').classList.add('hidden');
       document.getElementById('tab-print').classList.add('hidden');
-      document.getElementById('tab-scan-btn').className = "flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm";
-      document.getElementById('tab-manage-btn').className = "flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm";
-      document.getElementById('tab-print-btn').className = "flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm";
+      document.getElementById('tab-settings').classList.add('hidden');
+
+      var inactiveClass = "flex-1 py-2 font-bold text-gray-500 text-[11px] sm:text-xs";
+      var activeClass = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-[11px] sm:text-xs";
+
+      document.getElementById('tab-scan-btn').className = inactiveClass;
+      document.getElementById('tab-manage-btn').className = inactiveClass;
+      document.getElementById('tab-print-btn').className = inactiveClass;
+      document.getElementById('tab-settings-btn').className = inactiveClass;
 
       if (tab === 'scan') {
         document.getElementById('tab-scan').classList.remove('hidden');
-        document.getElementById('tab-scan-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm";
+        document.getElementById('tab-scan-btn').className = activeClass;
         isProcessingScan = false;
         try { html5QrCode.resume(); } catch(e){}
       } else if (tab === 'manage') {
         document.getElementById('tab-manage').classList.remove('hidden');
-        document.getElementById('tab-manage-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm";
+        document.getElementById('tab-manage-btn').className = activeClass;
         renderProductsList();
       } else if (tab === 'print') {
         document.getElementById('tab-print').classList.remove('hidden');
-        document.getElementById('tab-print-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm";
+        document.getElementById('tab-print-btn').className = activeClass;
         renderGeneratedBarcodesList();
+      } else if (tab === 'settings') {
+        document.getElementById('tab-settings').classList.remove('hidden');
+        document.getElementById('tab-settings-btn').className = activeClass;
+        loadSettingsUI();
+      }
+    }
+
+    // ==================== مدیریت تب تنظیمات پیام‌رسان‌ها ====================
+    function loadSettingsUI() {
+      var radios = document.getElementsByName('active_platform');
+      for (var i = 0; i < radios.length; i++) {
+        radios[i].checked = (radios[i].value === appSettings.platform);
+      }
+      document.getElementById('setting-tg-token').value = appSettings.telegramToken || '';
+      document.getElementById('setting-tg-chatid').value = appSettings.telegramChatId || '';
+      document.getElementById('setting-bale-token').value = appSettings.baleToken || '';
+      document.getElementById('setting-bale-chatid').value = appSettings.baleChatId || '';
+      updateSendButtonLabel();
+    }
+
+    function updatePlatformSelection(val) {
+      appSettings.platform = val;
+      updateSendButtonLabel();
+    }
+
+    function saveAppSettings() {
+      var selectedPlatform = 'telegram';
+      var radios = document.getElementsByName('active_platform');
+      for (var i = 0; i < radios.length; i++) {
+        if (radios[i].checked) {
+          selectedPlatform = radios[i].value;
+          break;
+        }
+      }
+
+      appSettings = {
+        platform: selectedPlatform,
+        telegramToken: document.getElementById('setting-tg-token').value.trim(),
+        telegramChatId: document.getElementById('setting-tg-chatid').value.trim(),
+        baleToken: document.getElementById('setting-bale-token').value.trim(),
+        baleChatId: document.getElementById('setting-bale-chatid').value.trim()
+      };
+
+      localStorage.setItem('invoice_app_settings', JSON.stringify(appSettings));
+      updateSendButtonLabel();
+      alert("تنظیمات با موفقیت ذخیره شد!");
+    }
+
+    function updateSendButtonLabel() {
+      var sendBtn = document.getElementById('send-btn');
+      if (!sendBtn) return;
+      if (appSettings.platform === 'telegram') {
+        sendBtn.innerHTML = '<span>✈️ ارسال فاکتور به تلگرام</span>';
+      } else if (appSettings.platform === 'bale') {
+        sendBtn.innerHTML = '<span>🍃 ارسال فاکتور به بله</span>';
+      } else {
+        sendBtn.innerHTML = '<span>🔄 ارسال فاکتور به تلگرام و بله</span>';
+      }
+    }
+
+    // تست ارسال پیام
+    async function testSendMessage(target) {
+      var now = new Date();
+      var timeStr = now.toLocaleTimeString('fa-IR');
+      var testMsg = "🔔 <b>پیام تست سیستم فروشگاهی</b>\nاین یک پیام آزمایشی جهت تایید اتصال صحیح ربات است.\n⏰ ساعت: " + timeStr;
+
+      if (target === 'telegram') {
+        var token = document.getElementById('setting-tg-token').value.trim() || appSettings.telegramToken;
+        var chatId = document.getElementById('setting-tg-chatid').value.trim() || appSettings.telegramChatId;
+        var res = await sendToTelegramAPI(testMsg, token, chatId);
+        if (res.ok) {
+          alert("پیام تست با موفقیت به تلگرام ارسال شد!");
+        } else {
+          alert("خطا در ارسال به تلگرام: " + (res.error || "تنظیمات توکن یا چت‌آیدی را بررسی کنید"));
+        }
+      } else if (target === 'bale') {
+        var bToken = document.getElementById('setting-bale-token').value.trim() || appSettings.baleToken;
+        var bChatId = document.getElementById('setting-bale-chatid').value.trim() || appSettings.baleChatId;
+        if (!bToken || !bChatId) {
+          alert("لطفاً ابتدا توکن و شناسه چت بازوی بله را وارد کنید.");
+          return;
+        }
+        var bRes = await sendToBaleAPI(testMsg, bToken, bChatId);
+        if (bRes.ok) {
+          alert("پیام تست با موفقیت به بازوی بله ارسال شد!");
+        } else {
+          alert("خطا در ارسال به بله: " + (bRes.error || "تنظیمات توکن یا چت‌آیدی را بررسی کنید"));
+        }
       }
     }
 
@@ -765,7 +969,7 @@
             '<div class="flex items-center justify-between gap-2">' +
               '<label class="flex items-center gap-2 cursor-pointer flex-1 min-w-0">' +
                 '<input type="checkbox" id="chk-' + barcode + '" data-barcode="' + barcode + '" class="print-item-check w-4 h-4 text-blue-600 rounded cursor-pointer" onchange="updateTotalPrintCount()">' +
-                '<span class="font-bold text-gray-800 text-xs sm:text-sm truncate">' + item.name + '</span>' +
+                '<span class="font-bold text-gray-800 text-xs sm:text-sm truncate">${item.name}</span>' +
               '</label>' +
               '<span class="text-blue-600 font-bold text-xs bg-blue-50 px-2 py-1 rounded shrink-0">' + item.price.toLocaleString() + ' تومان</span>' +
             '</div>' +
@@ -1094,95 +1298,33 @@
       reader.readAsText(file, "UTF-8");
     }
 
-    // ارسال فاکتور رسید دیجیتال به همراه درصد و مبلغ تخفیف به تلگرام
-    async function sendToTelegram() {
-      if (cart.length === 0) { alert("سبد خرید خالی است!"); return; }
-
-      const sendBtn = document.getElementById('send-btn');
-      sendBtn.disabled = true;
-      sendBtn.innerText = "در حال ارسال...";
-
-      // تاریخ و ساعت به وقت ایران
-      var now = new Date();
-      var dateStr = now.toLocaleDateString('fa-IR');
-      var timeStr = now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
-
-      var totalSum = 0;
-      var totalItemsCount = 0;
-
-      var text = "🧾 <b>فاکتور جدید فروشگاه</b>\n";
-      text += "📅 تاریخ: <code>" + dateStr + "</code> — ساعت: <code>" + timeStr + "</code>\n";
-      text += "━━━━━━━━━━━━━━━━━━━━\n\n";
-
-      for (var i = 0; i < cart.length; i++) {
-        var item = cart[i];
-        totalSum += item.total;
-        totalItemsCount += item.quantity;
-
-        var unitPrice = item.price.toLocaleString();
-        var totalPrice = item.total.toLocaleString();
-
-        text += (i + 1) + "️⃣ <b>" + item.name + "</b>\n";
-        text += "▫️ " + item.quantity + " عدد × " + unitPrice + " = <b>" + totalPrice + " تومان</b>\n";
-
-        if (i < cart.length - 1) {
-          text += "────────────────────\n";
-        }
-      }
-
-      // محاسبه تخفیف
-      var discInput = document.getElementById('discount-percent');
-      var discountPercent = discInput ? (parseInt(discInput.value) || 0) : 0;
-      if (discountPercent < 0) discountPercent = 0;
-      if (discountPercent > 100) discountPercent = 100;
-
-      var discountAmount = Math.round((totalSum * discountPercent) / 100);
-      var finalPayable = totalSum - discountAmount;
-
-      text += "\n━━━━━━━━━━━━━━━━━━━━\n";
-      text += "📦 <b>تعداد کل اقلام:</b> " + totalItemsCount + " عدد\n";
-      if (discountPercent > 0) {
-        text += "💵 <b>جمع فاکتور:</b> " + totalSum.toLocaleString() + " تومان\n";
-        text += "🎁 <b>تخفیف (" + discountPercent + "٪):</b> " + discountAmount.toLocaleString() + " تومان کسر شد\n";
-        text += "💰 <b>مبلغ نهایی پرداختی:</b> <b>" + finalPayable.toLocaleString() + " تومان</b>\n";
-      } else {
-        text += "💰 <b>جمع کل فاکتور:</b> <b>" + totalSum.toLocaleString() + " تومان</b>\n";
-      }
-      text += "━━━━━━━━━━━━━━━━━━━━";
-
+    // توابع ارسال فاکتور به تلگرام یا بله
+    async function sendToTelegramAPI(messageText, token, chatId) {
       try {
-        const response = await fetch(WORKER_URL, {
+        var bodyData = {
+          action: "send_invoice",
+          password: sessionStorage.getItem('app_pass'),
+          message: messageText
+        };
+        if (token) bodyData.token = token;
+        if (chatId) bodyData.chat_id = chatId;
+
+        var response = await fetch(WORKER_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            action: "send_invoice",
-            password: sessionStorage.getItem('app_pass'),
-            message: text 
-          })
+          body: JSON.stringify(bodyData)
         });
-
-        const data = await response.json();
-
-        if (response.ok && data.ok) {
-          alert("فاکتور با موفقیت به تلگرام ارسال شد!");
-          cart = [];
-          if (document.getElementById('discount-percent')) {
-            document.getElementById('discount-percent').value = 0;
-          }
-          updateCartUI();
-        } else {
-          alert("خطا در ارسال به تلگرام.");
-        }
-      } catch (err) {
-        alert("ارتباط با Worker تلگرام برقرار نشد.");
-        console.error("Error sending message:", err);
-      } finally {
-        sendBtn.disabled = false;
-        sendBtn.innerText = "ارسال فاکتور به تلگرام";
+        var data = await response.json();
+        return { ok: response.ok && data.ok, error: data.description || data.message };
+      } catch (e) {
+        return { ok: false, error: e.message };
       }
     }
 
-    window.addEventListener('DOMContentLoaded', checkAuthOnLoad);
-  </script>
-</body>
-</html>
+    async function sendToBaleAPI(messageText, token, chatId) {
+      if (!token || !chatId) {
+        return { ok: false, error: "توکن یا شناسه بازوی بله تعریف نشده است." };
+      }
+      try {
+        // ارسال مستقیم به API بله (پشتیبانی از پروتکل Bot API بله)
+        var response = await
