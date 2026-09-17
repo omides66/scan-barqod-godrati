@@ -195,10 +195,36 @@
             </div>
           </div>
 
-          <!-- ردیف نمایش مبلغ کسر شده تخفیف -->
+          <!-- باکس اعمال تخفیف مبلغی (تومانی) -->
+          <div class="flex items-center justify-between gap-2 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+            <span class="text-xs font-bold text-rose-900">تخفیف مبلغی:</span>
+            <div class="flex items-center gap-1">
+              <div class="flex items-center border border-rose-300 rounded-lg bg-white overflow-hidden shadow-sm">
+                <button type="button" onclick="changeFixedDiscount(-1000)" class="w-8 h-7 bg-rose-100 hover:bg-rose-200 text-rose-900 font-bold text-sm active:bg-rose-300 transition flex items-center justify-center">−</button>
+                <input type="text" id="discount-fixed" inputmode="numeric" oninput="formatPriceInput(this); updateCartUI();" placeholder="۰" class="w-20 text-center font-bold text-xs text-rose-800 bg-transparent outline-none dir-ltr">
+                <button type="button" onclick="changeFixedDiscount(1000)" class="w-8 h-7 bg-rose-100 hover:bg-rose-200 text-rose-900 font-bold text-sm active:bg-rose-300 transition flex items-center justify-center">+</button>
+              </div>
+              <span class="text-xs text-rose-800 font-bold">تومان</span>
+              <button type="button" onclick="clearFixedDiscount()" title="پاک کردن تخفیف مبلغی" class="text-rose-700 bg-white border border-rose-300 hover:bg-rose-100 px-2 h-7 rounded-lg font-bold text-xs transition">✕</button>
+            </div>
+          </div>
+
+          <!-- ردیف نمایش مبلغ کسر شده تخفیف درصدی -->
           <div id="discount-row" class="hidden flex justify-between items-center text-xs text-red-600 font-semibold bg-red-50 px-2.5 py-1.5 rounded-lg border border-red-100">
             <span>تخفیف کسر شده (<span id="discount-display-percent">0</span>٪):</span>
             <span>−<span id="discount-amount">0</span> تومان</span>
+          </div>
+
+          <!-- ردیف نمایش تخفیف مبلغی کسر شده -->
+          <div id="fixed-discount-row" class="hidden flex justify-between items-center text-xs text-rose-600 font-semibold bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-100">
+            <span>تخفیف مبلغی <span id="fixed-discount-hint" class="text-[10px] font-normal text-rose-500"></span>:</span>
+            <span>−<span id="fixed-discount-amount">0</span> تومان</span>
+          </div>
+
+          <!-- ردیف جمع کل تخفیف (وقتی هر دو نوع تخفیف اعمال شده باشد) -->
+          <div id="total-discount-row" class="hidden flex justify-between items-center text-xs text-red-700 font-bold bg-red-50 px-2.5 py-1.5 rounded-lg border border-red-200">
+            <span>جمع کل تخفیف:</span>
+            <span>−<span id="total-discount-amount">0</span> تومان</span>
           </div>
 
           <!-- مبلغ نهایی پرداختی -->
@@ -548,13 +574,23 @@
     }
 
     // تابع فرمت جداکننده ۳ رقم ۳ رقم برای ورودی قیمت
+    // ارقام فارسی/عربی و جداکننده‌های مختلف را هم می‌فهمد و خروجی همیشه انگلیسی و استاندارد است
     function formatPriceInput(input) {
-      var val = input.value.replace(/,/g, '').replace(/[^\d]/g, '');
+      var val = normalizeDecimalText(input.value).replace(/\./g, '');
       if (val) {
-        input.value = Number(val).toLocaleString();
+        input.value = Number(val).toLocaleString('en-US');
       } else {
         input.value = '';
       }
+    }
+
+    // خواندن مبلغ تومانی از یک فیلد متنی (با پشتیبانی ارقام فارسی/عربی و کاما)
+    function parseMoneyInput(raw) {
+      if (raw != null && String(raw).indexOf('-') !== -1) return 0; // مبلغ منفی معتبر نیست
+      var text = normalizeDecimalText(raw).replace(/\./g, '');
+      if (!text) return 0;
+      var num = Math.round(Number(text) || 0);
+      return num < 0 ? 0 : num;
     }
 
     // توابع پخش صدای بیپ بدون نیاز به فایل خارجی
@@ -901,10 +937,9 @@
     async function saveProduct() {
       const barcode = document.getElementById('new-barcode').value.trim();
       const name = document.getElementById('new-name').value.trim();
-      const rawPrice = document.getElementById('new-price').value.replace(/,/g, '');
-      const price = parseInt(rawPrice);
+      const price = parseMoneyInput(document.getElementById('new-price').value);
 
-      if (!barcode || !name || isNaN(price)) {
+      if (!barcode || !name || !(price > 0)) {
         alert("لطفاً تمامی فیلدها را به درستی وارد کنید.");
         return;
       }
@@ -1248,7 +1283,55 @@
       updateCartUI();
     }
 
-    // به‌روزرسانی رابط کاربری سبد خرید با کسر خودکار درصد تخفیف
+    // تنظیم تخفیف مبلغی (تومانی) با دکمه‌های + و -
+    function changeFixedDiscount(delta) {
+      var el = document.getElementById('discount-fixed');
+      if (!el) return;
+      var val = parseMoneyInput(el.value) + delta;
+      if (val < 0) val = 0;
+      el.value = val ? val.toLocaleString('en-US') : '';
+      updateCartUI();
+    }
+
+    // پاک کردن تخفیف مبلغی
+    function clearFixedDiscount() {
+      var el = document.getElementById('discount-fixed');
+      if (el) el.value = '';
+      updateCartUI();
+    }
+
+    // محاسبه همه تخفیف‌ها و مبلغ نهایی از جمع اقلام فاکتور
+    // ترتیب اعمال: اول تخفیف درصدی، بعد تخفیف مبلغی
+    // تخفیف مبلغی هرگز باعث منفی شدن مبلغ فاکتور نمی‌شود (حداکثر تا صفر شدن)
+    function computeDiscounts(subtotal) {
+      var sum = Number(subtotal) || 0;
+
+      var percentInput = document.getElementById('discount-percent');
+      var percent = percentInput ? (parseInt(percentInput.value) || 0) : 0;
+      if (percent < 0) percent = 0;
+      if (percent > 100) percent = 100;
+
+      var fixedInput = document.getElementById('discount-fixed');
+      var fixedRequested = fixedInput ? parseMoneyInput(fixedInput.value) : 0;
+      if (fixedRequested < 0) fixedRequested = 0;
+
+      var percentAmount = Math.round((sum * percent) / 100);
+      var afterPercent = sum - percentAmount;
+      var fixedAmount = Math.min(fixedRequested, afterPercent);
+
+      return {
+        subtotal: sum,
+        percent: percent,
+        percentAmount: percentAmount,
+        fixedRequested: fixedRequested,
+        fixedAmount: fixedAmount,
+        fixedCapped: fixedRequested > fixedAmount,
+        discountTotal: percentAmount + fixedAmount,
+        total: afterPercent - fixedAmount
+      };
+    }
+
+    // به‌روزرسانی رابط کاربری سبد خرید با کسر خودکار تخفیف درصدی و مبلغی
     function updateCartUI() {
       const cartList = document.getElementById('cart-list');
       const subtotalEl = document.getElementById('subtotal-price');
@@ -1256,17 +1339,25 @@
       const discountRow = document.getElementById('discount-row');
       const discountAmountEl = document.getElementById('discount-amount');
       const discountDisplayPercent = document.getElementById('discount-display-percent');
-      const discInput = document.getElementById('discount-percent');
+      const fixedRow = document.getElementById('fixed-discount-row');
+      const fixedAmountEl = document.getElementById('fixed-discount-amount');
+      const fixedHintEl = document.getElementById('fixed-discount-hint');
+      const totalDiscountRow = document.getElementById('total-discount-row');
+      const totalDiscountEl = document.getElementById('total-discount-amount');
 
-      var discountPercent = discInput ? (parseInt(discInput.value) || 0) : 0;
-      if (discountPercent < 0) discountPercent = 0;
-      if (discountPercent > 100) discountPercent = 100;
+      const toggle = function (el, show) {
+        if (!el) return;
+        if (show) el.classList.remove('hidden');
+        else el.classList.add('hidden');
+      };
 
       if (cart.length === 0) {
         cartList.innerHTML = '<li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>';
         if (subtotalEl) subtotalEl.innerText = "0";
         if (totalPriceEl) totalPriceEl.innerText = "0";
-        if (discountRow) discountRow.classList.add('hidden');
+        toggle(discountRow, false);
+        toggle(fixedRow, false);
+        toggle(totalDiscountRow, false);
         return;
       }
 
@@ -1289,18 +1380,28 @@
 
       if (subtotalEl) subtotalEl.innerText = sum.toLocaleString();
 
-      var discountAmount = Math.round((sum * discountPercent) / 100);
-      var finalTotal = sum - discountAmount;
+      // محاسبه تخفیف درصدی و مبلغی با تابع مشترک (همین منطق در ارسال فاکتور هم استفاده می‌شود)
+      var d = computeDiscounts(sum);
 
-      if (discountPercent > 0) {
-        if (discountRow) discountRow.classList.remove('hidden');
-        if (discountDisplayPercent) discountDisplayPercent.innerText = discountPercent;
-        if (discountAmountEl) discountAmountEl.innerText = discountAmount.toLocaleString();
-      } else {
-        if (discountRow) discountRow.classList.add('hidden');
+      if (d.percent > 0) {
+        if (discountDisplayPercent) discountDisplayPercent.innerText = d.percent;
+        if (discountAmountEl) discountAmountEl.innerText = d.percentAmount.toLocaleString();
       }
+      toggle(discountRow, d.percent > 0);
 
-      if (totalPriceEl) totalPriceEl.innerText = finalTotal.toLocaleString();
+      if (d.fixedAmount > 0) {
+        if (fixedAmountEl) fixedAmountEl.innerText = d.fixedAmount.toLocaleString();
+        if (fixedHintEl) fixedHintEl.innerText = d.fixedCapped ? '(تا صفر شدن فاکتور محدود شد)' : '';
+      }
+      toggle(fixedRow, d.fixedAmount > 0);
+
+      if (d.discountTotal > 0 && totalDiscountEl) {
+        totalDiscountEl.innerText = d.discountTotal.toLocaleString();
+      }
+      // ردیف جمع تخفیف فقط وقتی هر دو نوع تخفیف با هم اعمال شده باشد نمایش داده می‌شود
+      toggle(totalDiscountRow, d.percent > 0 && d.fixedAmount > 0);
+
+      if (totalPriceEl) totalPriceEl.innerText = d.total.toLocaleString();
     }
 
     function removeFromCart(index) {
@@ -1358,7 +1459,7 @@
       if (!item) return;
       document.getElementById('edit-barcode').value = barcode;
       document.getElementById('edit-name').value = item.name;
-      document.getElementById('edit-price').value = Number(item.price).toLocaleString();
+      document.getElementById('edit-price').value = Number(item.price).toLocaleString('en-US');
       document.getElementById('edit-unit').value = unitOf(item);
       document.getElementById('edit-modal').classList.remove('hidden');
     }
@@ -1370,10 +1471,9 @@
     async function saveEditedProduct() {
       var barcode = document.getElementById('edit-barcode').value;
       var name = document.getElementById('edit-name').value.trim();
-      var rawPrice = document.getElementById('edit-price').value.replace(/,/g, '');
-      var price = parseInt(rawPrice);
+      var price = parseMoneyInput(document.getElementById('edit-price').value);
 
-      if (!name || isNaN(price)) {
+      if (!name || !(price > 0)) {
         alert("لطفاً نام و قیمت کالا را به درستی وارد کنید.");
         return;
       }
@@ -1618,7 +1718,14 @@
         html += '<div class="text-xs space-y-1 border-t pt-2">';
         html += '<div class="flex justify-between"><span>جمع اقلام:</span><span class="font-bold">' + (Number(inv.subtotal) || 0).toLocaleString() + ' تومان</span></div>';
         if (inv.discountPercent > 0) {
-          html += '<div class="flex justify-between text-red-600"><span>تخفیف (' + inv.discountPercent + '٪):</span><span class="font-bold">− ' + (Number(inv.discountAmount) || 0).toLocaleString() + ' تومان</span></div>';
+          html += '<div class="flex justify-between text-red-600"><span>تخفیف (' + inv.discountPercent + '%):</span><span class="font-bold">− ' + (Number(inv.discountAmount) || 0).toLocaleString() + ' تومان</span></div>';
+        }
+        if (Number(inv.discountFixed) > 0) {
+          html += '<div class="flex justify-between text-rose-600"><span>تخفیف مبلغی:</span><span class="font-bold">− ' + Number(inv.discountFixed).toLocaleString() + ' تومان</span></div>';
+        }
+        if (Number(inv.discountPercent) > 0 && Number(inv.discountFixed) > 0) {
+          var invDiscountTotal = (Number(inv.discountAmount) || 0) + (Number(inv.discountFixed) || 0);
+          html += '<div class="flex justify-between text-red-700 font-bold"><span>جمع کل تخفیف:</span><span>− ' + invDiscountTotal.toLocaleString() + ' تومان</span></div>';
         }
         html += '<div class="flex justify-between text-sm text-blue-700 font-bold pt-1 border-t"><span>مبلغ پرداختی:</span><span>' + (Number(inv.total) || 0).toLocaleString() + ' تومان</span></div>';
         html += '</div>';
@@ -1770,6 +1877,7 @@
             subtotal: invoice.subtotal,
             discountPercent: invoice.discountPercent,
             discountAmount: invoice.discountAmount,
+            discountFixed: invoice.discountFixed,
             total: invoice.total
           })
         });
@@ -1834,23 +1942,29 @@
         }
       }
 
-      // محاسبه تخفیف
-      var discInput = document.getElementById('discount-percent');
-      var discountPercent = discInput ? (parseInt(discInput.value) || 0) : 0;
-      if (discountPercent < 0) discountPercent = 0;
-      if (discountPercent > 100) discountPercent = 100;
-
-      var discountAmount = Math.round((totalSum * discountPercent) / 100);
-      var finalPayable = totalSum - discountAmount;
+      // محاسبه تخفیف درصدی و مبلغی با تابع مشترک سبد خرید
+      var d = computeDiscounts(totalSum);
+      var discountPercent = d.percent;
+      var discountAmount = d.percentAmount;
+      var discountFixed = d.fixedAmount;
+      var finalPayable = d.total;
 
       text += "\n━━━━━━━━━━━━━━━━━━━━\n";
       var itemsSummary = [];
       if (totalItemsCount > 0) itemsSummary.push(formatQty(totalItemsCount, 'count'));
       if (totalWeight > 0) itemsSummary.push(formatQty(totalWeight, 'kg'));
       text += "📦 <b>تعداد کل اقلام:</b> " + itemsSummary.join(' و ') + "\n";
-      if (discountPercent > 0) {
+      if (d.discountTotal > 0) {
         text += "💵 <b>جمع فاکتور:</b> " + totalSum.toLocaleString() + " تومان\n";
-        text += "🎁 <b>تخفیف (" + discountPercent + "٪):</b> " + discountAmount.toLocaleString() + " تومان کسر شد\n";
+        if (discountPercent > 0) {
+          text += "🎁 <b>تخفیف (" + discountPercent + "٪):</b> " + discountAmount.toLocaleString() + " تومان کسر شد\n";
+        }
+        if (discountFixed > 0) {
+          text += "🎁 <b>تخفیف مبلغی:</b> " + discountFixed.toLocaleString() + " تومان کسر شد\n";
+        }
+        if (d.discountTotal > 0 && discountPercent > 0 && discountFixed > 0) {
+          text += "🧮 <b>جمع کل تخفیف:</b> " + d.discountTotal.toLocaleString() + " تومان\n";
+        }
         text += "💰 <b>مبلغ نهایی پرداختی:</b> <b>" + finalPayable.toLocaleString() + " تومان</b>\n";
       } else {
         text += "💰 <b>جمع کل فاکتور:</b> <b>" + totalSum.toLocaleString() + " تومان</b>\n";
@@ -1888,6 +2002,7 @@
             subtotal: totalSum,
             discountPercent: discountPercent,
             discountAmount: discountAmount,
+            discountFixed: discountFixed,
             total: finalPayable
           });
 
@@ -1896,6 +2011,9 @@
           cart = [];
           if (document.getElementById('discount-percent')) {
             document.getElementById('discount-percent').value = 0;
+          }
+          if (document.getElementById('discount-fixed')) {
+            document.getElementById('discount-fixed').value = '';
           }
           document.getElementById('customer-name').value = '';
           document.getElementById('customer-phone').value = '';
