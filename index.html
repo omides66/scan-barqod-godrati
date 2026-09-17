@@ -107,15 +107,40 @@
       <!-- اطلاعات محصول اسکن شده -->
       <div id="product-info" class="hidden bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4">
         <h2 id="product-name" class="font-bold text-gray-800 text-lg mb-1"></h2>
-        <p class="text-sm text-gray-600 mb-3">قیمت واحد: <span id="product-price" class="font-semibold text-blue-600"></span> تومان</p>
-        
-        <div class="flex items-center justify-between gap-2 mb-3">
-          <span class="text-sm font-medium text-gray-700">تعداد / مقدار:</span>
+        <p class="text-sm text-gray-600 mb-3"><span id="product-price-label">قیمت واحد:</span> <span id="product-price" class="font-semibold text-blue-600"></span> تومان<span id="product-unit-suffix"></span></p>
+
+        <!-- کنترل تعداد (کالای عددی) -->
+        <div id="qty-control" class="flex items-center justify-between gap-2 mb-3">
+          <span class="text-sm font-medium text-gray-700">تعداد:</span>
           <div class="flex items-center border border-gray-300 rounded-xl bg-white overflow-hidden shadow-sm">
             <button onclick="changeQty(-1)" class="w-12 h-11 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xl active:bg-gray-300 transition flex items-center justify-center">−</button>
             <input type="number" id="quantity" value="1" min="1" readonly class="w-14 text-center font-bold text-lg text-blue-700 bg-transparent outline-none">
             <button onclick="changeQty(1)" class="w-12 h-11 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xl active:bg-gray-300 transition flex items-center justify-center">+</button>
           </div>
+        </div>
+
+        <!-- کنترل وزن (کالای کیلویی) -->
+        <div id="weight-control" class="hidden mb-3">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="text-sm font-medium text-gray-700">وزن (کیلوگرم):</span>
+            <div class="flex items-center border border-gray-300 rounded-xl bg-white overflow-hidden shadow-sm">
+              <button onclick="changeQty(-0.5)" class="w-12 h-11 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-lg active:bg-gray-300 transition flex items-center justify-center">−</button>
+              <input type="text" id="weight" value="1" inputmode="decimal" oninput="updateLineTotal()" class="w-20 text-center font-bold text-lg text-blue-700 bg-transparent outline-none">
+              <button onclick="changeQty(0.5)" class="w-12 h-11 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-lg active:bg-gray-300 transition flex items-center justify-center">+</button>
+            </div>
+          </div>
+          <div class="flex gap-1.5 flex-wrap">
+            <button type="button" onclick="setWeight(0.5)" class="text-xs bg-white text-blue-700 border border-blue-300 hover:bg-blue-100 px-2.5 py-1 rounded-lg font-bold transition">۰٫۵</button>
+            <button type="button" onclick="setWeight(1)" class="text-xs bg-white text-blue-700 border border-blue-300 hover:bg-blue-100 px-2.5 py-1 rounded-lg font-bold transition">۱</button>
+            <button type="button" onclick="setWeight(2)" class="text-xs bg-white text-blue-700 border border-blue-300 hover:bg-blue-100 px-2.5 py-1 rounded-lg font-bold transition">۲</button>
+            <button type="button" onclick="setWeight(5)" class="text-xs bg-white text-blue-700 border border-blue-300 hover:bg-blue-100 px-2.5 py-1 rounded-lg font-bold transition">۵</button>
+          </div>
+        </div>
+
+        <!-- مبلغ محاسبه‌شده برای این کالا -->
+        <div class="flex justify-between items-center text-sm bg-white rounded-xl border border-blue-100 px-3 py-2 mb-3">
+          <span class="text-gray-600">مبلغ این کالا:</span>
+          <span class="font-bold text-blue-700"><span id="line-total">0</span> تومان</span>
         </div>
 
         <div class="flex gap-2">
@@ -213,6 +238,15 @@
           <div>
             <label class="text-xs text-gray-600 block mb-1">قیمت (تومان):</label>
             <input type="text" id="new-price" oninput="formatPriceInput(this)" placeholder="مثلاً: 45,000" class="w-full p-2 border rounded-lg text-sm dir-ltr text-right">
+          </div>
+
+          <div>
+            <label class="text-xs text-gray-600 block mb-1">واحد فروش:</label>
+            <select id="new-unit" class="w-full p-2 border rounded-lg text-sm bg-white">
+              <option value="count">عددی (تعداد)</option>
+              <option value="kg">کیلویی (وزنی)</option>
+            </select>
+            <p class="text-xs text-gray-400 mt-1">برای میوه، گوشت، آجیل و ... گزینه «کیلویی» را انتخاب کنید تا موقع فروش وزن وارد شود.</p>
           </div>
 
           <button id="save-btn" onclick="saveProduct()" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-bold text-sm hover:bg-indigo-700 transition">
@@ -392,6 +426,13 @@
           <label class="text-xs text-gray-600 block mb-1">قیمت (تومان):</label>
           <input type="text" id="edit-price" oninput="formatPriceInput(this)" class="w-full p-2 border rounded-lg text-sm dir-ltr text-right">
         </div>
+        <div>
+          <label class="text-xs text-gray-600 block mb-1">واحد فروش:</label>
+          <select id="edit-unit" class="w-full p-2 border rounded-lg text-sm bg-white">
+            <option value="count">عددی (تعداد)</option>
+            <option value="kg">کیلویی (وزنی)</option>
+          </select>
+        </div>
         <div class="flex gap-2 pt-2">
           <button type="button" id="edit-save-btn" onclick="saveEditedProduct()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-xl font-bold text-xs shadow transition">
             ذخیره تغییرات
@@ -433,6 +474,78 @@
     let isTorchOn = false;
     let isProcessingScan = false;
     let audioCtx = null;
+
+    // ==================== توابع کمکی واحد فروش (عددی / کیلویی) ====================
+    function unitOf(item) {
+      return (item && item.unit === 'kg') ? 'kg' : 'count';
+    }
+
+    function isKg(item) {
+      return unitOf(item) === 'kg';
+    }
+
+    // برچسب واحد برای نمایش کنار مبلغ
+    function unitPriceSuffix(item) {
+      return isKg(item) ? ' / کیلو' : '';
+    }
+
+    // گِرد کردن وزن به ۳ رقم اعشار برای جلوگیری از خطای اعشاری
+    function roundQty(q) {
+      return Math.round((Number(q) || 0) * 1000) / 1000;
+    }
+
+    // نمایش مقدار همراه واحد: «۲ عدد» یا «۱٫۲۵ کیلوگرم»
+    function formatQty(q, unit) {
+      var val = roundQty(q);
+      var text = val.toLocaleString('fa-IR', { maximumFractionDigits: 3 });
+      return text + (unit === 'kg' ? ' کیلوگرم' : ' عدد');
+    }
+
+    // محاسبه مبلغ یک ردیف: قیمت × مقدار (گرد شده به تومان)
+    function lineTotal(price, qty) {
+      return Math.round((Number(price) || 0) * (Number(qty) || 0));
+    }
+
+    // یکسان‌سازی ورودی عددی: ارقام فارسی/عربی و جداکننده اعشار به شکل استاندارد انگلیسی
+    // «۱٫۲۵» (کيبورد فارسی) و «١.٢٥» (عربی) و «1,25» هر سه به «1.25» تبدیل می‌شوند
+    function normalizeDecimalText(raw) {
+      var text = String(raw == null ? '' : raw);
+      // ارقام فارسی (U+06F0..U+06F9) و عربی (U+0660..U+0669) به انگلیسی
+      text = text.replace(/[\u06F0-\u06F9\u0660-\u0669]/g, function (d) {
+        var code = d.charCodeAt(0);
+        return String(code >= 0x06F0 ? code - 0x06F0 : code - 0x0660);
+      });
+      // جداکننده اعشار فارسی/عربی (U+066B, U+060C) و کاما به نقطه تبدیل می‌شود
+      text = text.replace(/[\u066B\u060C,]/g, '.');
+      // جداکننده هزارگان عربی (U+066C) حذف میشود
+      text = text.replace(/\u066C/g, '');
+      // سایر کاراکترهای غیرعددی حذف می‌شوند
+      text = text.replace(/[^\d.]/g, '');
+      // فقط اولین نقطه به‌عنوان اعشار باقی می‌ماند: «1.2.3» به «1.23»
+      return text.replace(/(\..*)\./g, '$1');
+    }
+
+    // خواندن مقدار از فرم اسکن بر اساس واحد کالا
+    function getCurrentQty() {
+      if (currentProduct && isKg(currentProduct)) {
+        return roundQty(normalizeDecimalText(document.getElementById('weight').value));
+      }
+      return parseInt(document.getElementById('quantity').value) || 1;
+    }
+
+    // به‌روزرسانی مبلغ نمایشی کالای در حال اسکن
+    function updateLineTotal() {
+      if (!currentProduct) return;
+      var qty = getCurrentQty();
+      if (isNaN(qty)) qty = 0;
+      document.getElementById('line-total').innerText = lineTotal(currentProduct.price, qty).toLocaleString();
+    }
+
+    // تعیین وزن از دکمه‌های سریع
+    function setWeight(value) {
+      document.getElementById('weight').value = value;
+      updateLineTotal();
+    }
 
     // تابع فرمت جداکننده ۳ رقم ۳ رقم برای ورودی قیمت
     function formatPriceInput(input) {
@@ -732,8 +845,19 @@
         playSuccessBeep();
         currentProduct = { barcode: decodedText, ...product };
         document.getElementById('product-name').innerText = product.name;
+
+        var kg = isKg(product);
+        document.getElementById('product-price-label').innerText = kg ? 'قیمت هر کیلو:' : 'قیمت واحد:';
+        document.getElementById('product-unit-suffix').innerText = unitPriceSuffix(product);
         document.getElementById('product-price').innerText = product.price.toLocaleString();
+
+        // نمایش کنترل مناسب بر اساس واحد کالا
+        document.getElementById('qty-control').classList.toggle('hidden', kg);
+        document.getElementById('weight-control').classList.toggle('hidden', !kg);
         document.getElementById('quantity').value = 1;
+        document.getElementById('weight').value = '1';
+        updateLineTotal();
+
         document.getElementById('product-info').classList.remove('hidden');
       } else {
         playErrorBeep();
@@ -789,7 +913,7 @@
       saveBtn.disabled = true;
       saveBtn.innerText = "در حال ذخیره...";
 
-      database[barcode] = { name: name, price: price };
+      database[barcode] = { name: name, price: price, unit: document.getElementById('new-unit').value === 'kg' ? 'kg' : 'count' };
       localStorage.setItem('grocery_db', JSON.stringify(database));
       
       await saveDatabaseToCloudflare();
@@ -797,6 +921,7 @@
       document.getElementById('new-barcode').value = '';
       document.getElementById('new-name').value = '';
       document.getElementById('new-price').value = '';
+      document.getElementById('new-unit').value = 'count';
       renderProductsList();
       
       saveBtn.disabled = false;
@@ -807,7 +932,7 @@
 
     function prepareBatchPrint(barcode) {
       selectedPrintItem = { barcode: barcode, ...database[barcode] };
-      document.getElementById('selected-print-title').innerText = `کالا: ${selectedPrintItem.name} (${selectedPrintItem.price.toLocaleString()} تومان)`;
+      document.getElementById('selected-print-title').innerText = `کالا: ${selectedPrintItem.name} (${selectedPrintItem.price.toLocaleString()} تومان${unitPriceSuffix(selectedPrintItem)})`;
       document.getElementById('batch-print-box').classList.remove('hidden');
     }
 
@@ -829,7 +954,7 @@
           <div class="label-card">
             <div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">${selectedPrintItem.name}</div>
             <svg id="${svgId}"></svg>
-            <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${selectedPrintItem.price.toLocaleString()} تومان</div>
+            <div style="font-size: 10px; font-weight: bold; margin-top: 2px;">${selectedPrintItem.price.toLocaleString()} تومان${unitPriceSuffix(selectedPrintItem)}</div>
           </div>
         `;
         printContainer.innerHTML += cardHtml;
@@ -851,11 +976,23 @@
     }
 
     function changeQty(amount) {
+      // برای کالای کیلویی، مقدار اعشاری و حداقل ۰٫۰۵ کیلو
+      if (currentProduct && isKg(currentProduct)) {
+        var w = getCurrentQty();
+        if (isNaN(w)) w = 0;
+        w = roundQty(w + amount);
+        if (w < 0.05) w = 0.05;
+        document.getElementById('weight').value = String(w);
+        updateLineTotal();
+        return;
+      }
+
       const qtyInput = document.getElementById('quantity');
       let currentVal = parseInt(qtyInput.value) || 1;
       currentVal += amount;
       if (currentVal < 1) currentVal = 1;
       qtyInput.value = currentVal;
+      updateLineTotal();
     }
 
     function switchTab(tab) {
@@ -970,7 +1107,7 @@
                 '<input type="checkbox" id="chk-' + barcode + '" data-barcode="' + barcode + '" class="print-item-check w-4 h-4 text-blue-600 rounded cursor-pointer" onchange="updateTotalPrintCount()">' +
                 '<span class="font-bold text-gray-800 text-xs sm:text-sm truncate">' + item.name + '</span>' +
               '</label>' +
-              '<span class="text-blue-600 font-bold text-xs bg-blue-50 px-2 py-1 rounded shrink-0">' + item.price.toLocaleString() + ' تومان</span>' +
+              '<span class="text-blue-600 font-bold text-xs bg-blue-50 px-2 py-1 rounded shrink-0">' + item.price.toLocaleString() + ' تومان' + unitPriceSuffix(item) + '</span>' +
             '</div>' +
             '<div class="flex justify-center py-1 overflow-hidden bg-gray-50 rounded-lg">' +
               '<svg id="' + svgId + '"></svg>' +
@@ -1017,6 +1154,7 @@
               barcode: barcode,
               name: database[barcode].name,
               price: database[barcode].price,
+              unit: unitOf(database[barcode]),
               count: qty
             });
           }
@@ -1040,7 +1178,7 @@
             '<div class="label-card">' +
               '<div style="font-size: 11px; font-weight: bold; margin-bottom: 2px;">' + item.name + '</div>' +
               '<svg id="' + svgId + '"></svg>' +
-              '<div style="font-size: 10px; font-weight: bold; margin-top: 2px;">' + item.price.toLocaleString() + ' تومان</div>' +
+              '<div style="font-size: 10px; font-weight: bold; margin-top: 2px;">' + item.price.toLocaleString() + ' تومان' + unitPriceSuffix(item) + '</div>' +
             '</div>';
           printContainer.innerHTML += cardHtml;
           totalIndex++;
@@ -1071,11 +1209,29 @@
 
     function addToCart() {
       if (!currentProduct) return;
-      const qty = parseInt(document.getElementById('quantity').value) || 1;
-      cart.push({ name: currentProduct.name, price: currentProduct.price, quantity: qty, total: currentProduct.price * qty });
+      const unit = unitOf(currentProduct);
+      const qty = getCurrentQty();
+
+      if (isNaN(qty) || qty <= 0) {
+        alert(unit === 'kg' ? "لطفاً وزن کالا را درست وارد کنید." : "لطفاً تعداد کالا را درست وارد کنید.");
+        return;
+      }
+      if (unit === 'kg' && qty > 5000) {
+        alert("وزن وارد شده بیش از حد بزرگ است. لطفاً وزن را دوباره بررسی کنید.");
+        return;
+      }
+
+      cart.push({
+        name: currentProduct.name,
+        price: currentProduct.price,
+        unit: unit,
+        quantity: qty,
+        total: lineTotal(currentProduct.price, qty)
+      });
       updateCartUI();
       document.getElementById('product-info').classList.add('hidden');
       document.getElementById('quantity').value = 1;
+      document.getElementById('weight').value = '1';
       currentProduct = null;
       isProcessingScan = false;
       try { html5QrCode.resume(); } catch(e){}
@@ -1122,7 +1278,7 @@
           <li class="py-2 flex justify-between items-center">
             <div>
               <span class="font-medium text-gray-800">${item.name}</span>
-              <span class="text-xs text-gray-400 block">${item.quantity} عدد × ${item.price.toLocaleString()}</span>
+              <span class="text-xs text-gray-400 block">${formatQty(item.quantity, item.unit)} × ${item.price.toLocaleString()}${unitPriceSuffix(item)}</span>
             </div>
             <div class="flex items-center gap-2">
               <span class="font-semibold">${item.total.toLocaleString()} تومان</span>
@@ -1156,7 +1312,7 @@
       let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
       Object.keys(database).forEach(barcode => {
         const item = database[barcode];
-        csvContent += `${barcode},${item.name},${item.price}\n`;
+        csvContent += `${barcode},${item.name},${item.price},${unitOf(item)}\n`;
       });
       const link = document.createElement("a");
       link.setAttribute("href", encodeURI(csvContent));
@@ -1183,8 +1339,8 @@
         listEl.innerHTML += `
           <div class="flex justify-between items-center p-2 bg-white rounded border text-xs">
             <div>
-              <p class="font-bold text-gray-800">${item.name}</p>
-              <p class="text-gray-400 dir-ltr text-right">${barcode} - ${item.price.toLocaleString()} تومان</p>
+              <p class="font-bold text-gray-800">${item.name}${isKg(item) ? ' <span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">کیلویی</span>' : ''}</p>
+              <p class="text-gray-400 dir-ltr text-right">${barcode} - ${item.price.toLocaleString()} تومان${unitPriceSuffix(item)}</p>
             </div>
             <div class="flex gap-1">
               ${isGenerated ? `<button onclick="prepareBatchPrint('${barcode}')" class="text-blue-600 bg-blue-50 px-2 py-1 rounded font-bold">🖨️ چاپ A4</button>` : ''}
@@ -1203,6 +1359,7 @@
       document.getElementById('edit-barcode').value = barcode;
       document.getElementById('edit-name').value = item.name;
       document.getElementById('edit-price').value = Number(item.price).toLocaleString();
+      document.getElementById('edit-unit').value = unitOf(item);
       document.getElementById('edit-modal').classList.remove('hidden');
     }
 
@@ -1225,7 +1382,7 @@
       saveBtn.disabled = true;
       saveBtn.innerText = "در حال ذخیره...";
 
-      database[barcode] = { name: name, price: price };
+      database[barcode] = { name: name, price: price, unit: document.getElementById('edit-unit').value === 'kg' ? 'kg' : 'count' };
       localStorage.setItem('grocery_db', JSON.stringify(database));
       await saveDatabaseToCloudflare();
 
@@ -1271,8 +1428,12 @@
               var priceRaw = parts[2].replace(/[^\d]/g, '');
               var price = parseInt(priceRaw);
 
+              // ستون چهارم اختیاری: واحد فروش (kg یا count)
+              var unitRaw = parts.length >= 4 ? parts[3].trim().toLowerCase() : '';
+              var unit = (unitRaw === 'kg' || unitRaw === 'کیلویی' || unitRaw === 'کیلو') ? 'kg' : 'count';
+
               if (barcode && name && !isNaN(price)) {
-                database[barcode] = { name: name, price: price };
+                database[barcode] = { name: name, price: price, unit: unit };
                 updatedCount++;
               }
             }
@@ -1392,6 +1553,10 @@
           const timeText = inv.timeStr ? ' — ' + inv.timeStr : '';
           const customer = inv.customerName || 'مشتری بدون نام';
           const phoneText = inv.phone ? '📞 ' + inv.phone : '';
+          const summaryParts = [];
+          if (inv.itemsCount > 0) summaryParts.push(formatQty(inv.itemsCount, 'count'));
+          if (inv.weightTotal > 0) summaryParts.push(formatQty(inv.weightTotal, 'kg'));
+          const qtySummary = summaryParts.length ? summaryParts.join(' و ') : '—';
           listEl.innerHTML += `
             <div class="p-3 bg-white rounded-xl border border-gray-200 shadow-sm">
               <div class="flex justify-between items-start gap-2 mb-1">
@@ -1400,7 +1565,7 @@
               </div>
               <p class="text-xs text-gray-500 dir-ltr text-right mb-2">${phoneText}</p>
               <div class="flex justify-between items-center pt-1 border-t border-gray-100">
-                <span class="text-xs text-gray-500">📅 ${dateText}${timeText} • ${inv.itemsCount || 0} قلم</span>
+                <span class="text-xs text-gray-500">📅 ${dateText}${timeText} • ${qtySummary}</span>
                 <button type="button" onclick="openInvoiceDetails('${inv.id}')" class="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg font-bold hover:bg-blue-700 transition">
                   مشاهده اقلام
                 </button>
@@ -1444,7 +1609,7 @@
         (inv.items || []).forEach(function (it) {
           html += '<div class="flex justify-between items-center text-xs border-b border-gray-100 pb-1">' +
                     '<div><span class="font-bold text-gray-800">' + it.name + '</span>' +
-                    '<span class="text-gray-400 block">' + it.quantity + ' × ' + (Number(it.price) || 0).toLocaleString() + '</span></div>' +
+                    '<span class="text-gray-400 block">' + formatQty(it.quantity, it.unit) + ' × ' + (Number(it.price) || 0).toLocaleString() + unitPriceSuffix(it) + '</span></div>' +
                     '<span class="font-bold text-gray-700">' + (Number(it.total) || 0).toLocaleString() + ' تومان</span>' +
                   '</div>';
         });
@@ -1601,6 +1766,7 @@
             phone: invoice.phone,
             items: invoice.items,
             itemsCount: invoice.itemsCount,
+            weightTotal: invoice.weightTotal,
             subtotal: invoice.subtotal,
             discountPercent: invoice.discountPercent,
             discountAmount: invoice.discountAmount,
@@ -1633,6 +1799,7 @@
 
       var totalSum = 0;
       var totalItemsCount = 0;
+      var totalWeight = 0;
 
       var text = "🧾 <b>فاکتور جدید فروشگاه</b>\n";
       text += "📅 تاریخ: <code>" + dateStr + "</code> — ساعت: <code>" + timeStr + "</code>\n";
@@ -1650,13 +1817,17 @@
       for (var i = 0; i < cart.length; i++) {
         var item = cart[i];
         totalSum += item.total;
-        totalItemsCount += item.quantity;
+        if (isKg(item)) {
+          totalWeight += roundQty(item.quantity);
+        } else {
+          totalItemsCount += Number(item.quantity) || 0;
+        }
 
         var unitPrice = item.price.toLocaleString();
         var totalPrice = item.total.toLocaleString();
 
         text += (i + 1) + "️⃣ <b>" + item.name + "</b>\n";
-        text += "▫️ " + item.quantity + " عدد × " + unitPrice + " = <b>" + totalPrice + " تومان</b>\n";
+        text += "▫️ " + formatQty(item.quantity, item.unit) + " × " + unitPrice + unitPriceSuffix(item) + " = <b>" + totalPrice + " تومان</b>\n";
 
         if (i < cart.length - 1) {
           text += "────────────────────\n";
@@ -1673,7 +1844,10 @@
       var finalPayable = totalSum - discountAmount;
 
       text += "\n━━━━━━━━━━━━━━━━━━━━\n";
-      text += "📦 <b>تعداد کل اقلام:</b> " + totalItemsCount + " عدد\n";
+      var itemsSummary = [];
+      if (totalItemsCount > 0) itemsSummary.push(formatQty(totalItemsCount, 'count'));
+      if (totalWeight > 0) itemsSummary.push(formatQty(totalWeight, 'kg'));
+      text += "📦 <b>تعداد کل اقلام:</b> " + itemsSummary.join(' و ') + "\n";
       if (discountPercent > 0) {
         text += "💵 <b>جمع فاکتور:</b> " + totalSum.toLocaleString() + " تومان\n";
         text += "🎁 <b>تخفیف (" + discountPercent + "٪):</b> " + discountAmount.toLocaleString() + " تومان کسر شد\n";
@@ -1710,6 +1884,7 @@
             phone: customerPhone,
             items: cart.slice(),
             itemsCount: totalItemsCount,
+            weightTotal: totalWeight,
             subtotal: totalSum,
             discountPercent: discountPercent,
             discountAmount: discountAmount,
