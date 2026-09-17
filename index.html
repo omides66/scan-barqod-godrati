@@ -91,6 +91,7 @@
       <button id="tab-scan-btn" onclick="switchTab('scan')" class="flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm">فروش و اسکن</button>
       <button id="tab-manage-btn" onclick="switchTab('manage')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">مدیریت اجناس</button>
       <button id="tab-print-btn" onclick="switchTab('print')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">چاپ بارکدها</button>
+      <button id="tab-customers-btn" onclick="switchTab('customers')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">📋 مشتریان</button>
       <button id="tab-settings-btn" onclick="switchTab('settings')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">⚙️ تنظیمات</button>
     </div>
 
@@ -133,6 +134,20 @@
         <ul id="cart-list" class="divide-y divide-gray-100 text-sm text-gray-600 mb-4 min-h-[50px]">
           <li class="py-2 text-center text-gray-400">هنوز کالایی اضافه نشده است.</li>
         </ul>
+
+        <!-- اطلاعات مشتری (اختیاری) -->
+        <div class="bg-purple-50 border border-purple-200 p-3 rounded-xl mb-3">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold text-purple-900">👤 اطلاعات مشتری (اختیاری)</span>
+            <button type="button" onclick="searchCustomerHistory()" class="text-xs bg-white text-purple-700 border border-purple-300 hover:bg-purple-100 px-2 py-1 rounded-lg font-bold transition">
+              📋 سابقه این مشتری
+            </button>
+          </div>
+          <div class="space-y-2">
+            <input type="text" id="customer-name" placeholder="نام مشتری (مثلاً: آقای رضایی)" class="w-full p-2 border rounded-lg text-sm bg-white">
+            <input type="tel" id="customer-phone" placeholder="شماره تماس (مثلاً: 09121234567)" class="w-full p-2 border rounded-lg text-sm dir-ltr bg-white">
+          </div>
+        </div>
 
         <!-- بخش مبالغ و اعمال درصد تخفیف -->
         <div class="space-y-2.5 border-t pt-3 mb-4">
@@ -266,6 +281,28 @@
       <div id="generated-barcodes-list" class="space-y-3 max-h-[380px] overflow-y-auto pr-1"></div>
     </div>
 
+    <!-- ==================== بخش مشتریان و سابقه خرید ==================== -->
+    <div id="tab-customers" class="hidden">
+      <div class="bg-blue-50 border border-blue-200 p-3 rounded-xl mb-3">
+        <h3 class="font-bold text-blue-900 text-xs sm:text-sm mb-2">📋 سابقه خرید مشتریان</h3>
+        <div class="flex gap-2 mb-2">
+          <input type="text" id="history-search" oninput="loadInvoiceHistory()" placeholder="نام مشتری یا شماره تماس..." class="flex-1 p-2 border rounded-lg text-xs sm:text-sm bg-white">
+          <button type="button" onclick="clearHistorySearch()" class="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-gray-300 transition">
+            پاک کردن
+          </button>
+        </div>
+        <div class="flex gap-1.5 flex-wrap mb-2">
+          <button type="button" id="range-all" onclick="setHistoryRange('all')" class="text-xs px-2.5 py-1 rounded-lg font-bold bg-blue-600 text-white transition">همه</button>
+          <button type="button" id="range-today" onclick="setHistoryRange('today')" class="text-xs px-2.5 py-1 rounded-lg font-bold bg-white text-blue-700 border border-blue-300 hover:bg-blue-100 transition">امروز</button>
+          <button type="button" id="range-7" onclick="setHistoryRange('7')" class="text-xs px-2.5 py-1 rounded-lg font-bold bg-white text-blue-700 border border-blue-300 hover:bg-blue-100 transition">۷ روز اخیر</button>
+          <button type="button" id="range-30" onclick="setHistoryRange('30')" class="text-xs px-2.5 py-1 rounded-lg font-bold bg-white text-blue-700 border border-blue-300 hover:bg-blue-100 transition">۳۰ روز اخیر</button>
+        </div>
+        <p id="history-status" class="text-xs text-blue-800"></p>
+      </div>
+
+      <div id="invoice-list" class="space-y-2 max-h-[400px] overflow-y-auto pr-1"></div>
+    </div>
+
     <!-- ==================== بخش تنظیمات (اتصال ربات پیام‌رسان) ==================== -->
     <div id="tab-settings" class="hidden">
       <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4">
@@ -364,6 +401,20 @@
           </button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- پاپ‌آپ مدال جزئیات فاکتور (سابقه خرید مشتری) -->
+  <div id="invoice-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl p-5 max-w-sm w-full shadow-xl text-right max-h-[85vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-3 pb-2 border-b">
+        <h3 class="font-bold text-gray-800 text-sm">🧾 جزئیات فاکتور</h3>
+        <button type="button" onclick="closeInvoiceModal()" class="text-gray-400 hover:text-gray-600 text-base font-bold">✕</button>
+      </div>
+      <div id="invoice-modal-body" class="text-sm text-gray-700"></div>
+      <button type="button" onclick="closeInvoiceModal()" class="w-full bg-gray-200 text-gray-700 py-2.5 rounded-xl font-bold text-xs hover:bg-gray-300 transition mt-4">
+        بستن
+      </button>
     </div>
   </div>
 
@@ -804,9 +855,11 @@
       document.getElementById('tab-manage').classList.add('hidden');
       document.getElementById('tab-print').classList.add('hidden');
       document.getElementById('tab-settings').classList.add('hidden');
+      document.getElementById('tab-customers').classList.add('hidden');
       document.getElementById('tab-scan-btn').className = "flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm";
       document.getElementById('tab-manage-btn').className = "flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm";
       document.getElementById('tab-print-btn').className = "flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm";
+      document.getElementById('tab-customers-btn').className = "flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm";
       document.getElementById('tab-settings-btn').className = "flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm";
 
       if (tab === 'scan') {
@@ -822,6 +875,10 @@
         document.getElementById('tab-print').classList.remove('hidden');
         document.getElementById('tab-print-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm";
         renderGeneratedBarcodesList();
+      } else if (tab === 'customers') {
+        document.getElementById('tab-customers').classList.remove('hidden');
+        document.getElementById('tab-customers-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm";
+        loadInvoiceHistory();
       } else if (tab === 'settings') {
         document.getElementById('tab-settings').classList.remove('hidden');
         document.getElementById('tab-settings-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm";
@@ -1231,6 +1288,169 @@
       reader.readAsText(file, "UTF-8");
     }
 
+    // ==================== آرشیو فاکتورها و سابقه مشتری ====================
+    let historyRange = 'all';
+
+    function setHistoryRange(range) {
+      historyRange = range;
+      ['all', 'today', '7', '30'].forEach(function (r) {
+        var btn = document.getElementById('range-' + r);
+        if (!btn) return;
+        btn.className = (r === range)
+          ? "text-xs px-2.5 py-1 rounded-lg font-bold bg-blue-600 text-white transition"
+          : "text-xs px-2.5 py-1 rounded-lg font-bold bg-white text-blue-700 border border-blue-300 hover:bg-blue-100 transition";
+      });
+      loadInvoiceHistory();
+    }
+
+    function clearHistorySearch() {
+      document.getElementById('history-search').value = '';
+      loadInvoiceHistory();
+    }
+
+    function getHistoryFrom() {
+      if (historyRange === 'today') {
+        var d = new Date();
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+      }
+      if (historyRange === '7') return Date.now() - 7 * 86400000;
+      if (historyRange === '30') return Date.now() - 30 * 86400000;
+      return 0;
+    }
+
+    // رفتن به تب مشتریان با فیلتر همین مشتری (از تب فروش)
+    function searchCustomerHistory() {
+      var name = document.getElementById('customer-name').value.trim();
+      var phone = document.getElementById('customer-phone').value.trim();
+      if (!name && !phone) {
+        alert("ابتدا نام مشتری یا شماره تماس را وارد کنید.");
+        return;
+      }
+      document.getElementById('history-search').value = phone || name;
+      switchTab('customers');
+    }
+
+    // دریافت لیست فاکتورها از سرور و نمایش آن
+    async function loadInvoiceHistory() {
+      const listEl = document.getElementById('invoice-list');
+      const statusEl = document.getElementById('history-status');
+      const q = document.getElementById('history-search').value.trim();
+      const pass = sessionStorage.getItem('app_pass');
+
+      statusEl.innerText = 'در حال جست‌وجو...';
+
+      try {
+        const params = new URLSearchParams();
+        if (q) params.set('q', q);
+        const from = getHistoryFrom();
+        if (from) params.set('from', String(from));
+
+        const res = await fetch(`${WORKER_URL}/invoices?${params.toString()}`, {
+          headers: { "Authorization": `Bearer ${pass}` }
+        });
+
+        if (!res.ok) {
+          statusEl.innerText = '⚠️ خطا در دریافت سابقه فاکتورها (کد ' + res.status + ')';
+          listEl.innerHTML = '';
+          return;
+        }
+
+        const data = await res.json();
+        const invoices = (data && data.invoices) ? data.invoices : [];
+        let sum = 0;
+        for (let i = 0; i < invoices.length; i++) sum += Number(invoices[i].total) || 0;
+
+        statusEl.innerText = invoices.length + ' فاکتور پیدا شد • جمع: ' + sum.toLocaleString() + ' تومان';
+
+        if (invoices.length === 0) {
+          listEl.innerHTML = '<p class="text-center text-xs text-gray-400 py-6">فاکتوری با این مشخصات پیدا نشد.</p>';
+          return;
+        }
+
+        listEl.innerHTML = '';
+        invoices.forEach(function (inv) {
+          const dateText = inv.dateStr || new Date(inv.ts).toLocaleDateString('fa-IR');
+          const timeText = inv.timeStr ? ' — ' + inv.timeStr : '';
+          const customer = inv.customerName || 'مشتری بدون نام';
+          const phoneText = inv.phone ? '📞 ' + inv.phone : '';
+          listEl.innerHTML += `
+            <div class="p-3 bg-white rounded-xl border border-gray-200 shadow-sm">
+              <div class="flex justify-between items-start gap-2 mb-1">
+                <span class="font-bold text-gray-800 text-xs sm:text-sm">${customer}</span>
+                <span class="text-blue-700 font-bold text-xs bg-blue-50 px-2 py-1 rounded shrink-0">${(Number(inv.total) || 0).toLocaleString()} تومان</span>
+              </div>
+              <p class="text-xs text-gray-500 dir-ltr text-right mb-2">${phoneText}</p>
+              <div class="flex justify-between items-center pt-1 border-t border-gray-100">
+                <span class="text-xs text-gray-500">📅 ${dateText}${timeText} • ${inv.itemsCount || 0} قلم</span>
+                <button type="button" onclick="openInvoiceDetails('${inv.id}')" class="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg font-bold hover:bg-blue-700 transition">
+                  مشاهده اقلام
+                </button>
+              </div>
+            </div>`;
+        });
+      } catch (err) {
+        console.error("خطا در دریافت سابقه فاکتورها:", err);
+        statusEl.innerText = '⚠️ ارتباط با سرور برقرار نشد.';
+        listEl.innerHTML = '';
+      }
+    }
+
+    // نمایش جزئیات کامل یک فاکتور (اقلام و قیمت واحد)
+    async function openInvoiceDetails(id) {
+      const pass = sessionStorage.getItem('app_pass');
+      const bodyEl = document.getElementById('invoice-modal-body');
+      bodyEl.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">در حال دریافت...</p>';
+      document.getElementById('invoice-modal').classList.remove('hidden');
+
+      try {
+        const res = await fetch(`${WORKER_URL}/invoices?id=${encodeURIComponent(id)}`, {
+          headers: { "Authorization": `Bearer ${pass}` }
+        });
+        if (!res.ok) {
+          bodyEl.innerHTML = '<p class="text-xs text-red-500 text-center py-4">خطا در دریافت فاکتور (کد ' + res.status + ')</p>';
+          return;
+        }
+        const inv = await res.json();
+        const dateText = inv.dateStr || new Date(inv.ts).toLocaleDateString('fa-IR');
+        const timeText = inv.timeStr ? ' — ' + inv.timeStr : '';
+
+        let html = '';
+        html += '<div class="bg-gray-50 rounded-xl p-3 mb-3 border border-gray-200">';
+        html += '<p class="text-xs text-gray-600 mb-1">👤 مشتری: <b class="text-gray-800">' + (inv.customerName || 'ثبت نشده') + '</b></p>';
+        html += '<p class="text-xs text-gray-600 mb-1">📞 تماس: <b class="text-gray-800 dir-ltr">' + (inv.phone || 'ثبت نشده') + '</b></p>';
+        html += '<p class="text-xs text-gray-600">📅 تاریخ: <b class="text-gray-800">' + dateText + timeText + '</b></p>';
+        html += '</div>';
+
+        html += '<div class="space-y-1 mb-3">';
+        (inv.items || []).forEach(function (it) {
+          html += '<div class="flex justify-between items-center text-xs border-b border-gray-100 pb-1">' +
+                    '<div><span class="font-bold text-gray-800">' + it.name + '</span>' +
+                    '<span class="text-gray-400 block">' + it.quantity + ' × ' + (Number(it.price) || 0).toLocaleString() + '</span></div>' +
+                    '<span class="font-bold text-gray-700">' + (Number(it.total) || 0).toLocaleString() + ' تومان</span>' +
+                  '</div>';
+        });
+        html += '</div>';
+
+        html += '<div class="text-xs space-y-1 border-t pt-2">';
+        html += '<div class="flex justify-between"><span>جمع اقلام:</span><span class="font-bold">' + (Number(inv.subtotal) || 0).toLocaleString() + ' تومان</span></div>';
+        if (inv.discountPercent > 0) {
+          html += '<div class="flex justify-between text-red-600"><span>تخفیف (' + inv.discountPercent + '٪):</span><span class="font-bold">− ' + (Number(inv.discountAmount) || 0).toLocaleString() + ' تومان</span></div>';
+        }
+        html += '<div class="flex justify-between text-sm text-blue-700 font-bold pt-1 border-t"><span>مبلغ پرداختی:</span><span>' + (Number(inv.total) || 0).toLocaleString() + ' تومان</span></div>';
+        html += '</div>';
+
+        bodyEl.innerHTML = html;
+      } catch (err) {
+        console.error("خطا در دریافت جزئیات فاکتور:", err);
+        bodyEl.innerHTML = '<p class="text-xs text-red-500 text-center py-4">ارتباط با سرور برقرار نشد.</p>';
+      }
+    }
+
+    function closeInvoiceModal() {
+      document.getElementById('invoice-modal').classList.add('hidden');
+    }
+
     // ==================== تنظیمات ربات پیام‌رسان ====================
     // خواندن تنظیمات فعلی از سرور (توکن کامل برنمی‌گردد، فقط وضعیت ثبت‌بودن)
     async function loadBotSettings() {
@@ -1344,6 +1564,42 @@
       }
     }
 
+    // ذخیره فاکتور در آرشیو سرور (برای سابقه مشتری و گزارش فروش)
+    async function saveInvoiceToServer(invoice) {
+      const pass = sessionStorage.getItem('app_pass');
+      try {
+        const res = await fetch(`${WORKER_URL}/invoices`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${pass}`
+          },
+          body: JSON.stringify({
+            action: "save_invoice",
+            password: pass,
+            dateStr: invoice.dateStr,
+            timeStr: invoice.timeStr,
+            customerName: invoice.customerName,
+            phone: invoice.phone,
+            items: invoice.items,
+            itemsCount: invoice.itemsCount,
+            subtotal: invoice.subtotal,
+            discountPercent: invoice.discountPercent,
+            discountAmount: invoice.discountAmount,
+            total: invoice.total
+          })
+        });
+        if (!res.ok) {
+          console.error("ذخیره فاکتور در آرشیو ناموفق بود. کد وضعیت:", res.status);
+          return false;
+        }
+        return true;
+      } catch (err) {
+        console.error("خطا در ذخیره فاکتور در آرشیو:", err);
+        return false;
+      }
+    }
+
     // ارسال فاکتور رسید دیجیتال به همراه درصد و مبلغ تخفیف به پیام‌رسان تنظیم‌شده
     async function sendToTelegram() {
       if (cart.length === 0) { alert("سبد خرید خالی است!"); return; }
@@ -1362,6 +1618,15 @@
 
       var text = "🧾 <b>فاکتور جدید فروشگاه</b>\n";
       text += "📅 تاریخ: <code>" + dateStr + "</code> — ساعت: <code>" + timeStr + "</code>\n";
+
+      // اطلاعات مشتری (اختیاری)
+      var customerName = document.getElementById('customer-name').value.trim();
+      var customerPhone = document.getElementById('customer-phone').value.trim();
+      if (customerName || customerPhone) {
+        text += "━━━━━━━━━━━━━━━━━━━━\n";
+        if (customerName) text += "👤 <b>مشتری:</b> " + customerName + "\n";
+        if (customerPhone) text += "📞 <b>تماس:</b> <code>" + customerPhone + "</code>\n";
+      }
       text += "━━━━━━━━━━━━━━━━━━━━\n\n";
 
       for (var i = 0; i < cart.length; i++) {
@@ -1418,11 +1683,29 @@
 
         if (res.ok && data.ok) {
           const providerName = data.provider === 'bale' ? 'بله' : 'تلگرام';
-          alert(`فاکتور با موفقیت به ${providerName} ارسال شد!`);
+
+          // ذخیره فاکتور در آرشیو سرور (برای سابقه مشتری و گزارش فروش)
+          const savedOk = await saveInvoiceToServer({
+            dateStr: dateStr,
+            timeStr: timeStr,
+            customerName: customerName,
+            phone: customerPhone,
+            items: cart.slice(),
+            itemsCount: totalItemsCount,
+            subtotal: totalSum,
+            discountPercent: discountPercent,
+            discountAmount: discountAmount,
+            total: finalPayable
+          });
+
+          alert(`فاکتور با موفقیت به ${providerName} ارسال شد!` + (savedOk ? "\n✅ در سابقه مشتری هم ذخیره شد." : "\n⚠️ فاکتور ارسال شد ولی در سابقه ذخیره نشد (اتصال سرور را بررسی کنید)."));
+
           cart = [];
           if (document.getElementById('discount-percent')) {
             document.getElementById('discount-percent').value = 0;
           }
+          document.getElementById('customer-name').value = '';
+          document.getElementById('customer-phone').value = '';
           updateCartUI();
         } else {
           alert("خطا در ارسال فاکتور: " + (data.error || (data.description ? data.description : "خطای نامشخص")));
