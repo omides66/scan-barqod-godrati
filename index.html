@@ -240,6 +240,7 @@
             </button>
           </div>
         </div>
+        <p id="db-status" class="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 mb-2"></p>
         <div id="products-list" class="space-y-2 max-h-60 overflow-y-auto"></div>
       </div>
     </div>
@@ -433,29 +434,70 @@
     }
 
     // همگام‌سازی دیتابیس با کلادفلر KV
+    // نمایش پیام وضعیت دیتابیس در تب مدیریت اجناس
+    function updateDbStatus(message) {
+      var statusEl = document.getElementById('db-status');
+      if (statusEl) statusEl.innerText = message;
+    }
+
     async function syncDatabaseWithCloudflare() {
       const pass = sessionStorage.getItem('app_pass');
+      const isAdminUser = sessionStorage.getItem('user_role') !== 'seller';
       try {
         const res = await fetch(`${WORKER_URL}/products`, {
           headers: { "Authorization": `Bearer ${pass}` }
         });
-        if (res.ok) {
-          const cloudData = await res.json();
-          if (cloudData && typeof cloudData === 'object' && Object.keys(cloudData).length > 0) {
-            database = cloudData;
-            localStorage.setItem('grocery_db', JSON.stringify(database));
-            renderProductsList();
-          }
+
+        if (!res.ok) {
+          console.error("دریافت اجناس از کلادفلر ناموفق بود. کد وضعیت:", res.status);
+          updateDbStatus("⚠️ اتصال به سرور برقرار نشد (کد " + res.status + ") — فقط اجناس این گوشی نمایش داده می‌شود.");
+          renderProductsList();
+          return;
         }
+
+        const cloudData = await res.json();
+        // پشتیبانی از هر دو شکل داده: نقشه ساده محصولات یا بسته {products: {...}}
+        const remote = (cloudData && cloudData.products && typeof cloudData.products === 'object')
+          ? cloudData.products
+          : cloudData;
+
+        if (remote && typeof remote === 'object' && Object.keys(remote).length > 0) {
+          database = remote;
+          localStorage.setItem('grocery_db', JSON.stringify(database));
+          updateDbStatus("✅ اجناس از سرور دریافت شد (" + Object.keys(database).length + " کالا)");
+        } else if (Object.keys(database).length > 0 && isAdminUser) {
+          // سرور خالی است ولی این گوشی اجناس دارد → انتقال به سرور تا فروشنده‌ها هم ببینند
+          updateDbStatus("⚠️ دیتابیس سرور خالی است.");
+          if (confirm("دیتابیس سرور خالی است، ولی " + Object.keys(database).length + " کالا در این گوشی ذخیره شده است.\nآیا این اجناس به سرور منتقل شود تا همه فروشنده‌ها ببینند؟")) {
+            const transferred = await saveDatabaseToCloudflare();
+            if (transferred) {
+              updateDbStatus("✅ " + Object.keys(database).length + " کالای این گوشی به سرور منتقل شد.");
+            } else {
+              updateDbStatus("❌ انتقال اجناس به سرور انجام نشد. اتصال و رمز عبور را بررسی کنید.");
+            }
+          }
+        } else if (Object.keys(database).length > 0) {
+          updateDbStatus("⚠️ دیتابیس سرور خالی است — اجناس این گوشی نمایش داده می‌شود.");
+        } else {
+          updateDbStatus("⚠️ دیتابیس سرور خالی است — کالایی برای نمایش وجود ندارد. مدیر باید اجناس را از گوشی خود به سرور منتقل کند.");
+        }
+
+        renderProductsList();
       } catch (err) {
         console.error("خطا در دریافت اجناس از کلادفلر:", err);
+        updateDbStatus("⚠️ خطا در ارتباط با سرور — فقط اجناس این گوشی نمایش داده می‌شود.");
       }
     }
 
     async function saveDatabaseToCloudflare() {
       const pass = sessionStorage.getItem('app_pass');
+      // محافظ: دیتابیس خالی روی سرور آپلود نمی‌شود تا داده فروشگاه پاک نشود
+      if (Object.keys(database).length === 0) {
+        console.error("دیتابیس محلی خالی است؛ برای جلوگیری از پاک شدن داده سرور، ارسال انجام نشد.");
+        return false;
+      }
       try {
-        await fetch(`${WORKER_URL}/products`, {
+        const res = await fetch(`${WORKER_URL}/products`, {
           method: "POST",
           headers: { 
             "Content-Type": "application/json",
@@ -463,8 +505,14 @@
           },
           body: JSON.stringify({ action: "save_products", password: pass, products: database })
         });
+        if (!res.ok) {
+          console.error("ذخیره دیتابیس روی کلادفلر ناموفق بود. کد وضعیت:", res.status);
+          return false;
+        }
+        return true;
       } catch (err) {
         console.error("خطا در ذخیره دیتابیس روی کلادفلر:", err);
+        return false;
       }
     }
 
