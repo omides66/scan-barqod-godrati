@@ -87,12 +87,13 @@
     </div>
 
     <!-- تب‌های بالای صفحه -->
-    <div class="flex border-b mb-4">
-      <button id="tab-scan-btn" onclick="switchTab('scan')" class="flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm">فروش و اسکن</button>
-      <button id="tab-manage-btn" onclick="switchTab('manage')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">مدیریت اجناس</button>
-      <button id="tab-print-btn" onclick="switchTab('print')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">چاپ بارکدها</button>
-      <button id="tab-customers-btn" onclick="switchTab('customers')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">📋 مشتریان</button>
-      <button id="tab-settings-btn" onclick="switchTab('settings')" class="flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm">⚙️ تنظیمات</button>
+    <div class="flex flex-wrap border-b mb-4">
+      <button id="tab-scan-btn" onclick="switchTab('scan')" class="flex-1 min-w-[86px] py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm">فروش و اسکن</button>
+      <button id="tab-manage-btn" onclick="switchTab('manage')" class="flex-1 min-w-[86px] py-2 font-bold text-gray-500 text-xs sm:text-sm">مدیریت اجناس</button>
+      <button id="tab-print-btn" onclick="switchTab('print')" class="flex-1 min-w-[86px] py-2 font-bold text-gray-500 text-xs sm:text-sm">چاپ بارکدها</button>
+      <button id="tab-debts-btn" onclick="switchTab('debts')" class="flex-1 min-w-[86px] py-2 font-bold text-gray-500 text-xs sm:text-sm">💳 نسیه</button>
+      <button id="tab-customers-btn" onclick="switchTab('customers')" class="flex-1 min-w-[86px] py-2 font-bold text-gray-500 text-xs sm:text-sm">📋 مشتریان</button>
+      <button id="tab-settings-btn" onclick="switchTab('settings')" class="flex-1 min-w-[86px] py-2 font-bold text-gray-500 text-xs sm:text-sm">⚙️ تنظیمات</button>
     </div>
 
     <!-- ==================== بخش فروش و اسکن ==================== -->
@@ -169,8 +170,18 @@
             </button>
           </div>
           <div class="space-y-2">
-            <input type="text" id="customer-name" placeholder="نام مشتری (مثلاً: آقای رضایی)" class="w-full p-2 border rounded-lg text-sm bg-white">
-            <input type="tel" id="customer-phone" placeholder="شماره تماس (مثلاً: 09121234567)" class="w-full p-2 border rounded-lg text-sm dir-ltr bg-white">
+            <input type="text" id="customer-name" placeholder="نام مشتری (مثلاً: آقای رضایی)" onchange="lookupCustomerDebt()" class="w-full p-2 border rounded-lg text-sm bg-white">
+            <input type="tel" id="customer-phone" placeholder="شماره تماس (مثلاً: 09121234567)" onchange="lookupCustomerDebt()" class="w-full p-2 border rounded-lg text-sm dir-ltr bg-white">
+            <p id="customer-debt-hint" class="text-xs text-purple-800 hidden"></p>
+            <div class="flex gap-2">
+              <label class="flex items-center gap-2 text-xs text-purple-900 bg-white border border-purple-200 rounded-lg p-2 cursor-pointer flex-1">
+                <input type="checkbox" id="is-credit-sale" class="w-4 h-4 rounded cursor-pointer shrink-0">
+                <span>💳 این فروش <b>نسیه</b> است (به دفتر بدهی مشتری اضافه شود)</span>
+              </label>
+              <button type="button" onclick="openCustomerDebtLedger()" title="مشاهده دفتر بدهی این مشتری" class="bg-white text-purple-700 border border-purple-300 hover:bg-purple-100 px-2.5 py-2 rounded-lg text-xs font-bold transition shrink-0">
+                 دفتر بدهی
+              </button>
+            </div>
           </div>
         </div>
 
@@ -341,6 +352,35 @@
       <div id="generated-barcodes-list" class="space-y-3 max-h-[380px] overflow-y-auto pr-1"></div>
     </div>
 
+    <!-- ==================== بخش نسیه و بدهکاران ==================== -->
+    <div id="tab-debts" class="hidden">
+      <div class="bg-rose-50 border border-rose-200 p-3 rounded-xl mb-3">
+        <div class="flex justify-between items-center mb-2 gap-2">
+          <h3 class="font-bold text-rose-900 text-xs sm:text-sm">💳 نسیه و بدهکاران</h3>
+          <button type="button" onclick="openAddDebtor()" class="text-xs bg-white text-rose-700 border border-rose-300 hover:bg-rose-100 px-2.5 py-1 rounded-lg font-bold transition shrink-0">
+            ➕ ثبت بدهکار
+          </button>
+        </div>
+        <div class="flex gap-2 mb-2">
+          <input type="text" id="debt-search" oninput="loadDebts()" placeholder="نام مشتری یا شماره تماس..." class="flex-1 p-2 border rounded-lg text-xs sm:text-sm bg-white">
+          <button type="button" onclick="clearDebtSearch()" class="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-gray-300 transition shrink-0">
+            پاک کردن
+          </button>
+        </div>
+        <label class="flex items-center gap-2 text-xs text-rose-900 mb-2 cursor-pointer">
+          <input type="checkbox" id="debt-only-due" onchange="loadDebts()" class="w-4 h-4 rounded cursor-pointer">
+          فقط کسانی که بدهی دارند
+        </label>
+        <div class="flex justify-between items-center text-xs bg-white rounded-lg border border-rose-100 p-2">
+          <span class="text-gray-600">تعداد پرونده: <span id="debt-count" class="font-bold text-gray-800">0</span></span>
+          <span class="text-gray-600">جمع بدهی: <span id="debt-total-due" class="font-bold text-rose-700 text-sm">0</span> تومان</span>
+        </div>
+        <p id="debt-status" class="text-xs text-rose-800 mt-2"></p>
+      </div>
+
+      <div id="debt-list" class="space-y-2 max-h-[400px] overflow-y-auto pr-1"></div>
+    </div>
+
     <!-- ==================== بخش مشتریان و سابقه خرید ==================== -->
     <div id="tab-customers" class="hidden">
       <div class="bg-blue-50 border border-blue-200 p-3 rounded-xl mb-3">
@@ -480,6 +520,107 @@
       </div>
       <div id="invoice-modal-body" class="text-sm text-gray-700"></div>
       <button type="button" onclick="closeInvoiceModal()" class="w-full bg-gray-200 text-gray-700 py-2.5 rounded-xl font-bold text-xs hover:bg-gray-300 transition mt-4">
+        بستن
+      </button>
+    </div>
+  </div>
+
+  <!-- پاپ‌آپ ثبت بدهکار جدید / افزودن بدهی -->
+  <div id="debt-form-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl p-5 max-w-sm w-full shadow-xl text-right max-h-[85vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-3 pb-2 border-b">
+        <h3 id="debt-form-title" class="font-bold text-gray-800 text-sm">ثبت بدهکار جدید</h3>
+        <button type="button" onclick="closeDebtForm()" class="text-gray-400 hover:text-gray-600 text-base font-bold">✕</button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-gray-600 block mb-1">نام مشتری:</label>
+          <input type="text" id="debt-name" placeholder="مثلاً: آقای رضایی" class="w-full p-2 border rounded-lg text-sm">
+        </div>
+        <div>
+          <label class="text-xs text-gray-600 block mb-1">شماره تماس:</label>
+          <input type="tel" id="debt-phone" placeholder="۰۹۱۲۱۲۳۴۵۶۷" class="w-full p-2 border rounded-lg text-sm dir-ltr">
+        </div>
+        <div>
+          <label class="text-xs text-gray-600 block mb-1">مبلغ بدهی (تومان):</label>
+          <input type="text" id="debt-amount" inputmode="numeric" oninput="formatPriceInput(this)" placeholder="مثلاً: 250,000" class="w-full p-2 border rounded-lg text-sm dir-ltr text-right">
+        </div>
+        <div>
+          <label class="text-xs text-gray-600 block mb-1">تاریخ:</label>
+          <div class="flex gap-2">
+            <input type="text" id="debt-date" class="flex-1 p-2 border rounded-lg text-sm">
+            <button type="button" onclick="setDebtDateToday('debt-date')" class="bg-gray-100 text-gray-700 px-3 rounded-lg text-xs font-bold hover:bg-gray-200 transition shrink-0">امروز</button>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-gray-600 block mb-1">توضیح (اختیاری):</label>
+          <input type="text" id="debt-note" placeholder="مثلاً: بدهی قبلی / خریدی که نقد پرداخت نشد" class="w-full p-2 border rounded-lg text-sm">
+        </div>
+        <p class="text-xs text-gray-500">اگر مشتری از قبل پرونده داشته باشد، به همان پرونده اضافه می‌شود (بر اساس شماره تماس یا نام).</p>
+        <div class="flex gap-2 pt-1">
+          <button type="button" id="debt-form-submit" onclick="submitDebtForm()" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white py-2.5 rounded-xl font-bold text-xs shadow transition">
+            ثبت بدهی
+          </button>
+          <button type="button" onclick="closeDebtForm()" class="bg-gray-200 text-gray-700 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-300 transition">
+            انصراف
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- پاپ‌آپ ثبت پرداخت مشتری -->
+  <div id="debt-pay-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl p-5 max-w-sm w-full shadow-xl text-right max-h-[85vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-3 pb-2 border-b">
+        <h3 class="font-bold text-gray-800 text-sm">💵 ثبت پرداخت مشتری</h3>
+        <button type="button" onclick="closeDebtPay()" class="text-gray-400 hover:text-gray-600 text-base font-bold">✕</button>
+      </div>
+      <div class="bg-green-50 border border-green-200 rounded-xl p-2.5 mb-3 text-xs">
+        <p class="text-green-900 font-bold" id="debt-pay-customer"></p>
+        <p class="text-green-800 mt-1">بدهی فعلی: <b id="debt-pay-balance">0</b> تومان</p>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-gray-600 block mb-1">مبلغ پرداختی (تومان):</label>
+          <input type="text" id="debt-pay-amount" inputmode="numeric" oninput="formatPriceInput(this)" placeholder="مثلاً: 100,000" class="w-full p-2 border rounded-lg text-sm dir-ltr text-right">
+          <div class="flex gap-1.5 mt-2">
+            <button type="button" onclick="fillFullPayment()" class="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded-lg font-bold">تسویه کامل</button>
+            <button type="button" onclick="fillHalfPayment()" class="text-xs bg-gray-100 text-gray-700 border border-gray-200 px-2 py-1 rounded-lg font-bold">نصف</button>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-gray-600 block mb-1">تاریخ پرداخت:</label>
+          <div class="flex gap-2">
+            <input type="text" id="debt-pay-date" class="flex-1 p-2 border rounded-lg text-sm">
+            <button type="button" onclick="setDebtDateToday('debt-pay-date')" class="bg-gray-100 text-gray-700 px-3 rounded-lg text-xs font-bold hover:bg-gray-200 transition shrink-0">امروز</button>
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-gray-600 block mb-1">توضیح (اختیاری):</label>
+          <input type="text" id="debt-pay-note" placeholder="مثلاً: پرداخت نقدی / کارت به کارت" class="w-full p-2 border rounded-lg text-sm">
+        </div>
+        <div class="flex gap-2 pt-1">
+          <button type="button" id="debt-pay-submit" onclick="submitDebtPayment()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-xl font-bold text-xs shadow transition">
+            ثبت پرداخت
+          </button>
+          <button type="button" onclick="closeDebtPay()" class="bg-gray-200 text-gray-700 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-300 transition">
+            انصراف
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- پاپ‌آپ دفتر حساب یک مشتری -->
+  <div id="debt-ledger-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl p-5 max-w-sm w-full shadow-xl text-right max-h-[85vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-3 pb-2 border-b">
+        <h3 class="font-bold text-gray-800 text-sm">📒 دفتر حساب مشتری</h3>
+        <button type="button" onclick="closeDebtLedger()" class="text-gray-400 hover:text-gray-600 text-base font-bold">✕</button>
+      </div>
+      <div id="debt-ledger-body" class="text-sm text-gray-700"></div>
+      <button type="button" onclick="closeDebtLedger()" class="w-full bg-gray-200 text-gray-700 py-2.5 rounded-xl font-bold text-xs hover:bg-gray-300 transition mt-4">
         بستن
       </button>
     </div>
@@ -1037,11 +1178,13 @@
       document.getElementById('tab-print').classList.add('hidden');
       document.getElementById('tab-settings').classList.add('hidden');
       document.getElementById('tab-customers').classList.add('hidden');
-      document.getElementById('tab-scan-btn').className = "flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm";
-      document.getElementById('tab-manage-btn').className = "flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm";
-      document.getElementById('tab-print-btn').className = "flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm";
-      document.getElementById('tab-customers-btn').className = "flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm";
-      document.getElementById('tab-settings-btn').className = "flex-1 py-2 font-bold text-gray-500 text-xs sm:text-sm";
+      document.getElementById('tab-debts').classList.add('hidden');
+      document.getElementById('tab-scan-btn').className = "flex-1 min-w-[86px] py-2 font-bold text-gray-500 text-xs sm:text-sm";
+      document.getElementById('tab-manage-btn').className = "flex-1 min-w-[86px] py-2 font-bold text-gray-500 text-xs sm:text-sm";
+      document.getElementById('tab-print-btn').className = "flex-1 min-w-[86px] py-2 font-bold text-gray-500 text-xs sm:text-sm";
+      document.getElementById('tab-customers-btn').className = "flex-1 min-w-[86px] py-2 font-bold text-gray-500 text-xs sm:text-sm";
+      document.getElementById('tab-settings-btn').className = "flex-1 min-w-[86px] py-2 font-bold text-gray-500 text-xs sm:text-sm";
+      document.getElementById('tab-debts-btn').className = "flex-1 min-w-[86px] py-2 font-bold text-gray-500 text-xs sm:text-sm";
 
       if (tab === 'scan') {
         document.getElementById('tab-scan').classList.remove('hidden');
@@ -1056,6 +1199,10 @@
         document.getElementById('tab-print').classList.remove('hidden');
         document.getElementById('tab-print-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm";
         renderGeneratedBarcodesList();
+      } else if (tab === 'debts') {
+        document.getElementById('tab-debts').classList.remove('hidden');
+        document.getElementById('tab-debts-btn').className = "flex-1 min-w-[86px] py-2 font-bold text-rose-600 border-b-2 border-rose-600 text-xs sm:text-sm";
+        loadDebts();
       } else if (tab === 'customers') {
         document.getElementById('tab-customers').classList.remove('hidden');
         document.getElementById('tab-customers-btn').className = "flex-1 py-2 font-bold text-blue-600 border-b-2 border-blue-600 text-xs sm:text-sm";
@@ -1878,23 +2025,422 @@
             discountPercent: invoice.discountPercent,
             discountAmount: invoice.discountAmount,
             discountFixed: invoice.discountFixed,
-            total: invoice.total
+            total: invoice.total,
+            paymentMethod: invoice.paymentMethod
           })
         });
         if (!res.ok) {
           console.error("ذخیره فاکتور در آرشیو ناموفق بود. کد وضعیت:", res.status);
           return false;
         }
-        return true;
+        return await res.json().catch(function () { return true; });
       } catch (err) {
         console.error("خطا در ذخیره فاکتور در آرشیو:", err);
         return false;
       }
     }
 
+    // ==================== نسیه و بدهکاران ====================
+    // ثبت نسیه و پرداخت برای ادمین و فروشنده آزاد است؛ اصلاح/حذف فقط با ادمین
+    let debtDebtors = [];
+
+    // جلوگیری از تزریق کد از طریق نام/توضیح مشتری
+    function escapeHtml(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // درخواست به مسیرهای دفتر بدهی
+    async function debtApi(method, path, body) {
+      const pass = sessionStorage.getItem('app_pass');
+      const opts = { method: method, headers: { "Authorization": `Bearer ${pass}` } };
+      if (body) {
+        opts.headers["Content-Type"] = "application/json";
+        opts.body = JSON.stringify(body);
+      }
+      const res = await fetch(`${WORKER_URL}${path}`, opts);
+      let data = null;
+      try { data = await res.json(); } catch (e) { data = null; }
+      return { ok: res.ok, status: res.status, data: data };
+    }
+
+    function setDebtDateToday(id) {
+      const el = document.getElementById(id);
+      if (el) el.value = new Date().toLocaleDateString('fa-IR');
+    }
+
+    function clearDebtSearch() {
+      document.getElementById('debt-search').value = '';
+      loadDebts();
+    }
+
+    function findDebtorById(id) {
+      for (var i = 0; i < debtDebtors.length; i++) {
+        if (debtDebtors[i] && debtDebtors[i].id === id) return debtDebtors[i];
+      }
+      return null;
+    }
+
+    // دریافت لیست بدهکاران از سرور
+    async function loadDebts() {
+      const listEl = document.getElementById('debt-list');
+      const statusEl = document.getElementById('debt-status');
+      const q = document.getElementById('debt-search').value.trim();
+      const onlyDue = document.getElementById('debt-only-due').checked;
+
+      statusEl.innerText = 'در حال دریافت...';
+
+      const params = new URLSearchParams();
+      if (q) params.set('q', q);
+      if (onlyDue) params.set('only', 'due');
+
+      try {
+        const res = await debtApi('GET', '/debts?' + params.toString());
+        if (!res.ok) {
+          statusEl.innerText = '⚠️ خطا در دریافت دفتر بدهکاران (کد ' + res.status + ')';
+          listEl.innerHTML = '';
+          return;
+        }
+        const data = res.data || {};
+        debtDebtors = data.debtors || [];
+        document.getElementById('debt-count').innerText = (Number(data.total) || 0).toLocaleString();
+        document.getElementById('debt-total-due').innerText = (Number(data.totalDue) || 0).toLocaleString();
+        statusEl.innerText = debtDebtors.length
+          ? ''
+          : ((q || onlyDue) ? 'موردی با این مشخصات پیدا نشد.' : 'هنوز هیچ پرونده بدهی ثبت نشده است. با «➕ ثبت بدهکار» شروع کنید.');
+        renderDebtList();
+      } catch (err) {
+        console.error("خطا در دریافت دفتر بدهکاران:", err);
+        statusEl.innerText = '⚠️ ارتباط با سرور برقرار نشد.';
+        listEl.innerHTML = '';
+      }
+    }
+
+    // نمایش لیست بدهکاران
+    function renderDebtList() {
+      const listEl = document.getElementById('debt-list');
+      if (!debtDebtors.length) {
+        listEl.innerHTML = '';
+        return;
+      }
+      const admin = isAdminUser();
+      listEl.innerHTML = '';
+
+      debtDebtors.forEach(function (d) {
+        const balance = Number(d.balance) || 0;
+        const balanceClass = balance > 0 ? 'text-rose-700' : (balance < 0 ? 'text-green-700' : 'text-gray-600');
+        const balanceLabel = balance > 0 ? 'بدهکار' : (balance < 0 ? 'طلبکار' : 'تسویه شده');
+
+        listEl.innerHTML +=
+          '<div class="p-3 bg-white rounded-xl border border-gray-200 shadow-sm">' +
+            '<div class="flex justify-between items-start gap-2">' +
+              '<div class="min-w-0">' +
+                '<p class="font-bold text-gray-800 text-xs sm:text-sm truncate">' + escapeHtml(d.name || 'بدون نام') + '</p>' +
+                '<p class="text-xs text-gray-500 dir-ltr text-right">' + escapeHtml(d.phone || '') + '</p>' +
+                (d.lastDateStr ? '<p class="text-[11px] text-gray-400 mt-1">آخرین تراکنش: ' + escapeHtml(d.lastDateStr) + '</p>' : '') +
+              '</div>' +
+              '<div class="text-left shrink-0">' +
+                '<p class="' + balanceClass + ' font-bold text-sm">' + Math.abs(balance).toLocaleString() + ' تومان</p>' +
+                '<p class="text-[10px] text-gray-400">' + balanceLabel + '</p>' +
+              '</div>' +
+            '</div>' +
+            '<div class="flex gap-1.5 mt-2 pt-2 border-t border-gray-100">' +
+              '<button type="button" onclick="openDebtPay(\'' + d.id + '\')" class="flex-1 bg-green-600 text-white text-xs font-bold py-1.5 rounded-lg hover:bg-green-700 transition">💵 پرداخت</button>' +
+              '<button type="button" onclick="openDebtLedger(\'' + d.id + '\')" class="flex-1 bg-gray-100 text-gray-700 text-xs font-bold py-1.5 rounded-lg hover:bg-gray-200 transition">📒 دفتر حساب</button>' +
+              '<button type="button" onclick="openAddCredit(\'' + d.id + '\')" class="flex-1 bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold py-1.5 rounded-lg hover:bg-rose-100 transition">➕ بدهی</button>' +
+              (admin ? '<button type="button" onclick="deleteDebtor(\'' + d.id + '\')" title="حذف پرونده (مدیر)" class="bg-red-50 text-red-600 text-xs font-bold px-2 py-1.5 rounded-lg hover:bg-red-100 transition">🗑</button>' : '') +
+            '</div>' +
+          '</div>';
+      });
+    }
+
+// تشخیص بدهی مشتری هنگام تایپ نام/شماره در تب فروش
+    var debtCustomerHintId = null;
+
+    async function lookupCustomerDebt() {
+      const name = document.getElementById('customer-name').value.trim();
+      const phone = document.getElementById('customer-phone').value.trim();
+      const hint = document.getElementById('customer-debt-hint');
+      debtCustomerHintId = null;
+      if (!name && !phone) { hint.classList.add('hidden'); return; }
+      try {
+        const q = phone || name;
+        const r = await debtApi('GET', '/debts?q=' + encodeURIComponent(q));
+        const debtors = (r.ok && r.data && r.data.debtors) || [];
+        // اول تطبیق شماره، بعد تطبیق نام
+        let match = null;
+        for (var i = 0; i < debtors.length; i++) {
+          if (phone && debtors[i].phone && debtors[i].phone === phone) { match = debtors[i]; break; }
+        }
+        if (!match) {
+          for (var j = 0; j < debtors.length; j++) {
+            if (name && debtors[j].name && debtors[j].name.indexOf(name) !== -1) { match = debtors[j]; break; }
+          }
+        }
+        if (!match) { hint.classList.add('hidden'); return; }
+        debtCustomerHintId = match.id;
+        const bal = Number(match.balance) || 0;
+        hint.innerText = '💳 ' + (match.name || 'مشتری') + (bal > 0
+          ? ': بدهی فعلی ' + Math.abs(bal).toLocaleString() + ' تومان'
+          : (bal < 0 ? ': طلب ' + Math.abs(bal).toLocaleString() + ' تومان' : ': حساب تسویه است'));
+        hint.classList.remove('hidden');
+      } catch (err) {
+        console.error('خطا در بررسی بدهی مشتری:', err);
+        hint.classList.add('hidden');
+      }
+    }
+
+    // دکمه «دفتر بدهی» در باکس اطلاعات مشتری (تب فروش)
+    function openCustomerDebtLedger() {
+      const name = document.getElementById('customer-name').value.trim();
+      const phone = document.getElementById('customer-phone').value.trim();
+      if (debtCustomerHintId) { openDebtLedger(debtCustomerHintId); return; }
+      if (phone || name) {
+        lookupCustomerDebt().then(function () {
+          if (debtCustomerHintId) openDebtLedger(debtCustomerHintId);
+          else alert('برای این مشتری هنوز پرونده بدهی ثبت نشده است.');
+        });
+        return;
+      }
+      alert('اول نام یا شماره تماس مشتری را وارد کنید.');
+    }
+
+    // ==================== اکشن‌های مدال‌های دفتر بدهی ====================
+    let debtFormMode = null;   // 'credit-new' بدهکار جدید | 'credit' افزودن بدهی به پرونده موجود
+    let debtPayTarget = null;  // پرونده انتخاب‌شده برای مدال پرداخت
+
+    // مدال «ثبت بدهکار جدید»
+    function openAddDebtor() {
+      debtFormMode = 'credit-new';
+      debtPayTarget = null;
+      document.getElementById('debt-form-title').innerText = 'ثبت بدهکار جدید';
+      document.getElementById('debt-form-submit').innerText = 'ثبت بدهی';
+      document.getElementById('debt-name').value = '';
+      document.getElementById('debt-phone').value = '';
+      document.getElementById('debt-amount').value = '';
+      document.getElementById('debt-note').value = '';
+      document.getElementById('debt-name').readOnly = false;
+      document.getElementById('debt-phone').readOnly = false;
+      setDebtDateToday('debt-date');
+      document.getElementById('debt-form-modal').classList.remove('hidden');
+    }
+
+    // دکمه «➕ بدهی» روی پرونده موجود
+    function openAddCredit(id) {
+      const d = findDebtorById(id);
+      if (!d) return;
+      debtFormMode = 'credit';
+      debtPayTarget = { id: d.id };
+      document.getElementById('debt-form-title').innerText = 'افزودن بدهی — ' + (d.name || 'بدون نام');
+      document.getElementById('debt-form-submit').innerText = 'ثبت بدهی';
+      document.getElementById('debt-name').value = d.name || '';
+      document.getElementById('debt-phone').value = d.phone || '';
+      document.getElementById('debt-amount').value = '';
+      document.getElementById('debt-note').value = '';
+      document.getElementById('debt-name').readOnly = true;
+      document.getElementById('debt-phone').readOnly = true;
+      setDebtDateToday('debt-date');
+      document.getElementById('debt-form-modal').classList.remove('hidden');
+    }
+
+    function closeDebtForm() {
+      document.getElementById('debt-form-modal').classList.add('hidden');
+      debtPayTarget = null;
+    }
+
+    // ثبت بدهی (پرونده جدید یا موجود)
+    async function submitDebtForm() {
+      const amount = parseMoneyInput(document.getElementById('debt-amount').value);
+      const name = document.getElementById('debt-name').value.trim();
+      const phone = document.getElementById('debt-phone').value.trim();
+      const note = document.getElementById('debt-note').value.trim();
+      const dateStr = document.getElementById('debt-date').value.trim();
+      const isNew = debtFormMode === 'credit-new';
+      if (isNew && !name && !phone) { alert('نام یا شماره تماس مشتری را وارد کنید.'); return; }
+      if (!amount) { alert('مبلغ بدهی را درست وارد کنید.'); return; }
+
+      const btn = document.getElementById('debt-form-submit');
+      btn.disabled = true;
+      btn.innerText = 'در حال ثبت...';
+      try {
+        const payload = { action: 'add_credit', amount: amount, name: name, phone: phone, note: note, dateStr: dateStr, by: isAdminUser() ? 'admin' : 'seller' };
+        if (debtPayTarget && debtPayTarget.id) payload.id = debtPayTarget.id;
+        const r = await debtApi('POST', '/debts', payload);
+        if (r.ok && r.data && r.data.ok) {
+          alert('✅ بدهی ثبت شد.\nمانده جدید: ' + (Number(r.data.debtor && r.data.debtor.balance) || 0).toLocaleString() + ' تومان');
+          closeDebtForm();
+          loadDebts();
+        } else {
+          alert((r.data && r.data.error) || ('خطا در ثبت بدهی (کد ' + r.status + ')'));
+        }
+      } catch (err) {
+        console.error(err);
+        alert('ارتباط با سرور برقرار نشد!');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'ثبت بدهی';
+      }
+    }
+
+    // مدال «ثبت پرداخت مشتری»
+    function openDebtPay(id) {
+      const d = findDebtorById(id);
+      if (!d) return;
+      debtPayTarget = { id: d.id };
+      const balance = Number(d.balance) || 0;
+      document.getElementById('debt-pay-customer').innerText = (d.name || 'بدون نام') + (d.phone ? ' — ' + d.phone : '');
+      document.getElementById('debt-pay-balance').innerText = Math.abs(balance).toLocaleString();
+      document.getElementById('debt-pay-amount').value = '';
+      document.getElementById('debt-pay-note').value = '';
+      setDebtDateToday('debt-pay-date');
+      document.getElementById('debt-pay-modal').classList.remove('hidden');
+    }
+
+    function closeDebtPay() {
+      document.getElementById('debt-pay-modal').classList.add('hidden');
+      debtPayTarget = null;
+    }
+
+    // مبلغ پیشنهادی پرداخت: تسویه کامل یا نصف مانده
+    function fillFullPayment() {
+      if (!debtPayTarget) return;
+      const d = findDebtorById(debtPayTarget.id);
+      if (!d) return;
+      document.getElementById('debt-pay-amount').value = Math.max(0, Number(d.balance) || 0).toLocaleString();
+    }
+
+    function fillHalfPayment() {
+      if (!debtPayTarget) return;
+      const d = findDebtorById(debtPayTarget.id);
+      if (!d) return;
+      document.getElementById('debt-pay-amount').value = Math.round(Math.max(0, (Number(d.balance) || 0)) / 2).toLocaleString();
+    }
+
+    // ثبت پرداخت مشتری
+    async function submitDebtPayment() {
+      if (!debtPayTarget || !debtPayTarget.id) return;
+      const amount = parseMoneyInput(document.getElementById('debt-pay-amount').value);
+      if (!amount) { alert('مبلغ پرداخت را درست وارد کنید.'); return; }
+
+      const btn = document.getElementById('debt-pay-submit');
+      btn.disabled = true;
+      btn.innerText = 'در حال ثبت...';
+      try {
+        const r = await debtApi('POST', '/debts', {
+          action: 'add_payment',
+          id: debtPayTarget.id,
+          amount: amount,
+          dateStr: document.getElementById('debt-pay-date').value.trim(),
+          note: document.getElementById('debt-pay-note').value.trim()
+        });
+        if (r.ok && r.data && r.data.ok) {
+          const bal = Number(r.data.debtor && r.data.debtor.balance) || 0;
+          alert(bal > 0
+            ? '✅ پرداخت ثبت شد.\nباقیمانده بدهی: ' + bal.toLocaleString() + ' تومان'
+            : '✅ پرداخت ثبت شد.\n🎉 این مشتری تسویه شد!');
+          closeDebtPay();
+          loadDebts();
+        } else {
+          alert((r.data && r.data.error) || ('خطا در ثبت پرداخت (کد ' + r.status + ')'));
+        }
+      } catch (err) {
+        console.error(err);
+        alert('ارتباط با سرور برقرار نشد!');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'ثبت پرداخت';
+      }
+    }
+
+    // دفتر حساب کامل یک مشتری
+    async function openDebtLedger(id) {
+      const modal = document.getElementById('debt-ledger-modal');
+      const body = document.getElementById('debt-ledger-body');
+      body.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">در حال دریافت...</p>';
+      modal.classList.remove('hidden');
+      try {
+        const r = await debtApi('GET', '/debts?id=' + encodeURIComponent(id));
+        if (!r.ok || !r.data || !r.data.id) {
+          body.innerHTML = '<p class="text-xs text-red-500 text-center py-4">' + ((r.data && r.data.error) || ('خطا در دریافت دفتر حساب (کد ' + r.status + ')')) + '</p>';
+          return;
+        }
+        const d = r.data; // پاسخ سرور آبجکت کامل پرونده است (id, name, phone, tx, creditTotal, paymentTotal, balance)
+        // مانده بعد از هر تراکنش را از قدیم به جدید حساب می‌کنیم تا تاریخچه «چقدر مانده بود» را هم نشان دهد
+        const ordered = Array.isArray(d.tx) ? d.tx.slice() : [];
+        let running = 0;
+        const withBalance = ordered.map(function (t) {
+          running += (t.type === 'payment' ? -1 : 1) * (Number(t.amount) || 0);
+          return { t: t, after: running };
+        });
+        const tx = withBalance.slice().reverse(); // جدیدترین اول برای نمایش
+        let html = '';
+        html += '<div class="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-3 text-xs">';
+        html += '<p class="text-gray-700 mb-1">👤 <b>' + escapeHtml(d.name || 'بدون نام') + '</b>' + (d.phone ? ' — <span class="dir-ltr">' + escapeHtml(d.phone) + '</span>' : '') + '</p>';
+        html += '<p class="text-gray-700 mb-1">مانده فعلی: <b class="' + ((Number(d.balance) || 0) > 0 ? 'text-rose-700' : (Number(d.balance) || 0) < 0 ? 'text-green-700' : 'text-green-600') + '">' + Math.abs(Number(d.balance) || 0).toLocaleString() + ' تومان ' + ((Number(d.balance) || 0) > 0 ? 'بدهی' : (Number(d.balance) || 0) < 0 ? 'طلب' : '(تسویه)') + '</b></p>';
+        html += '<p class="text-gray-500">💰 جمع خرید نسیه: ' + (Number(d.creditTotal) || 0).toLocaleString() + ' تومان | 💵 جمع پرداختی: ' + (Number(d.paymentTotal) || 0).toLocaleString() + ' تومان</p>';
+        html += '</div>';
+        if (!tx.length) {
+          html += '<p class="text-xs text-gray-400 text-center py-3">هنوز تراکنشی ثبت نشده است.</p>';
+        } else {
+          html += '<div class="space-y-1.5">';
+          tx.forEach(function (row) {
+            const t = row.t;
+            const isPay = t.type === 'payment';
+            html += '<div class="flex justify-between items-center gap-2 p-2 rounded-lg border ' + (isPay ? 'bg-green-50 border-green-100' : 'bg-rose-50 border-rose-100') + '">';
+            html += '<div class="min-w-0">';
+            html += '<p class="text-xs font-bold ' + (isPay ? 'text-green-800' : 'text-rose-800') + '">' + (isPay ? '💵 پرداخت' : '🧾 خرید نسیه') + ' — ' + (Number(t.amount) || 0).toLocaleString() + ' تومان</p>';
+            html += '<p class="text-[11px] text-gray-500">' + escapeHtml(t.dateStr || '') + (t.note ? ' • ' + escapeHtml(t.note) : '') + '</p>';
+            html += '</div>';
+            html += '<span class="text-[10px] text-gray-400 shrink-0">' + (t.by === 'admin' ? 'مدیر' : 'فروشنده') + '</span>';
+            html += '</div>';
+            html += '<p class="text-[10px] text-gray-500 mt-1">مانده بعد از این تراکنش: <b>' + Math.abs(row.after).toLocaleString() + ' تومان</b>' + (row.after < 0 ? ' (طلبکار)' : (row.after === 0 ? ' (تسویه)' : '')) + '</p>';
+          });
+          html += '</div>';
+        }
+        body.innerHTML = html;
+      } catch (err) {
+        console.error(err);
+        body.innerHTML = '<p class="text-xs text-red-500 text-center py-4">ارتباط با سرور برقرار نشد.</p>';
+      }
+    }
+
+    function closeDebtLedger() {
+      document.getElementById('debt-ledger-modal').classList.add('hidden');
+    }
+
+    // حذف کامل پرونده بدهی (فقط ادمین)
+    async function deleteDebtor(id) {
+      const d = findDebtorById(id);
+      if (!d) return;
+      if (!confirm('حذف کامل پرونده «' + (d.name || 'بدون نام') + '» با تمام تراکنش‌هایش؟ این عمل برگشت‌پذیر نیست.')) return;
+      try {
+        const r = await debtApi('POST', '/debts', { action: 'delete_debtor', id: id });
+        if (r.ok && r.data && r.data.ok) {
+          alert('🗑 پرونده حذف شد.');
+          loadDebts();
+        } else {
+          alert((r.data && r.data.error) || ('خطا در حذف پرونده (کد ' + r.status + ')'));
+        }
+      } catch (err) {
+        console.error(err);
+        alert('ارتباط با سرور برقرار نشد!');
+      }
+    }
+
     // ارسال فاکتور رسید دیجیتال به همراه درصد و مبلغ تخفیف به پیام‌رسان تنظیم‌شده
     async function sendToTelegram() {
       if (cart.length === 0) { alert("سبد خرید خالی است!"); return; }
+
+      // فروش نسیه بدون مشخصات مشتری مجاز نیست (بدهی باید به یک پرونده بچسبد)
+      var isCreditSale = !!(document.getElementById('is-credit-sale') && document.getElementById('is-credit-sale').checked);
+      if (isCreditSale && !document.getElementById('customer-name').value.trim() && !document.getElementById('customer-phone').value.trim()) {
+        alert("برای فروش نسیه، حتماً نام یا شماره تماس مشتری را وارد کنید تا بدهی به حسابش ثبت شود.");
+        return;
+      }
 
       const sendBtn = document.getElementById('send-btn');
       sendBtn.disabled = true;
@@ -1921,6 +2467,11 @@
         if (customerPhone) text += "📞 <b>تماس:</b> <code>" + customerPhone + "</code>\n";
       }
       text += "━━━━━━━━━━━━━━━━━━━━\n\n";
+
+      // اگر فروش نسیه است، در متن فاکتور هم اعلام می‌شود
+      if (isCreditSale) {
+        text += "💳 <b>نوع فروش:</b> نسیه (ثبت در دفتر بدهی)\n━━━━━━━━━━━━━━━━━━━━\n\n";
+      }
 
       for (var i = 0; i < cart.length; i++) {
         var item = cart[i];
@@ -2003,10 +2554,18 @@
             discountPercent: discountPercent,
             discountAmount: discountAmount,
             discountFixed: discountFixed,
-            total: finalPayable
+            total: finalPayable,
+            paymentMethod: (document.getElementById('is-credit-sale') && document.getElementById('is-credit-sale').checked) ? 'credit' : 'cash'
           });
 
-          alert(`فاکتور با موفقیت به ${providerName} ارسال شد!` + (savedOk ? "\n✅ در سابقه مشتری هم ذخیره شد." : "\n⚠️ فاکتور ارسال شد ولی در سابقه ذخیره نشد (اتصال سرور را بررسی کنید)."));
+          const creditSale = document.getElementById('is-credit-sale') && document.getElementById('is-credit-sale').checked;
+          let creditNote = '';
+          if (creditSale && savedOk && savedOk.paymentMethod === 'credit') {
+            creditNote = savedOk.debt && savedOk.debt.balance > 0
+              ? '\n💳 ' + Math.abs(savedOk.debt.balance).toLocaleString() + ' تومان به دفتر بدهی مشتری اضافه شد.'
+              : '\n💳 فروش نسیه ثبت شد.';
+          }
+          alert(`فاکتور با موفقیت به ${providerName} ارسال شد!` + (savedOk ? '\n✅ در سابقه مشتری هم ذخیره شد.' : '\n⚠️ فاکتور ارسال شد ولی در سابقه ذخیره نشد (اتصال سرور را بررسی کنید).') + creditNote);
 
           cart = [];
           if (document.getElementById('discount-percent')) {
@@ -2017,6 +2576,11 @@
           }
           document.getElementById('customer-name').value = '';
           document.getElementById('customer-phone').value = '';
+          var creditChk = document.getElementById('is-credit-sale');
+          if (creditChk) creditChk.checked = false;
+          var debtHint = document.getElementById('customer-debt-hint');
+          if (debtHint) debtHint.classList.add('hidden');
+          debtCustomerHintId = null;
           updateCartUI();
         } else {
           alert("خطا در ارسال فاکتور: " + (data.error || (data.description ? data.description : "خطای نامشخص")));
