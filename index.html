@@ -139,7 +139,7 @@
         <div class="bg-purple-50 border border-purple-200 p-3 rounded-xl mb-3">
           <div class="flex justify-between items-center mb-2">
             <span class="text-xs font-bold text-purple-900">👤 اطلاعات مشتری (اختیاری)</span>
-            <button type="button" onclick="searchCustomerHistory()" class="text-xs bg-white text-purple-700 border border-purple-300 hover:bg-purple-100 px-2 py-1 rounded-lg font-bold transition">
+            <button id="customer-history-btn" type="button" onclick="searchCustomerHistory()" class="text-xs bg-white text-purple-700 border border-purple-300 hover:bg-purple-100 px-2 py-1 rounded-lg font-bold transition">
               📋 سابقه این مشتری
             </button>
           </div>
@@ -653,9 +653,18 @@
     function applyRoleUI() {
       var isAdmin = sessionStorage.getItem('user_role') !== 'seller';
       document.getElementById('tab-settings-btn').style.display = isAdmin ? '' : 'none';
+      document.getElementById('tab-customers-btn').style.display = isAdmin ? '' : 'none';
+      var historyBtn = document.getElementById('customer-history-btn');
+      if (historyBtn) historyBtn.style.display = isAdmin ? '' : 'none';
       if (!isAdmin) {
         document.getElementById('tab-settings').classList.add('hidden');
+        document.getElementById('tab-customers').classList.add('hidden');
       }
+    }
+
+    // آیا کاربر فعلی ادمین است؟
+    function isAdminUser() {
+      return sessionStorage.getItem('user_role') !== 'seller';
     }
 
     // به‌روزرسانی متن دکمه ارسال فاکتور بر اساس پیام‌رسان تنظیم‌شده
@@ -1321,6 +1330,10 @@
 
     // رفتن به تب مشتریان با فیلتر همین مشتری (از تب فروش)
     function searchCustomerHistory() {
+      if (!isAdminUser()) {
+        alert("سابقه خرید مشتریان فقط برای مدیر قابل مشاهده است.");
+        return;
+      }
       var name = document.getElementById('customer-name').value.trim();
       var phone = document.getElementById('customer-phone').value.trim();
       if (!name && !phone) {
@@ -1335,6 +1348,11 @@
     async function loadInvoiceHistory() {
       const listEl = document.getElementById('invoice-list');
       const statusEl = document.getElementById('history-status');
+      if (!isAdminUser()) {
+        statusEl.innerText = '⚠️ سابقه فاکتورها فقط برای مدیر قابل مشاهده است.';
+        listEl.innerHTML = '';
+        return;
+      }
       const q = document.getElementById('history-search').value.trim();
       const pass = sessionStorage.getItem('app_pass');
 
